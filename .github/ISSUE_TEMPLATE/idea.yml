@@ -1,0 +1,15 @@
+name: Idea
+description: Algo que se me ocurrió y no quiero olvidar (se detalla después)
+title: "idea: "
+labels: ["idea", "borrador"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: La idea
+    validations:
+      required: true
+  - type: textarea
+    id: porque
+    attributes:
+      label: Por qué estaría bien

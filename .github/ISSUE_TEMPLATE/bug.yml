@@ -1,0 +1,33 @@
+name: Bug
+description: Algo no funciona como debería
+title: "fix(área): "
+labels: ["fix"]
+body:
+  - type: textarea
+    id: que
+    attributes:
+      label: Qué pasa
+      description: Qué ocurre y qué esperaba que ocurriera.
+    validations:
+      required: true
+  - type: textarea
+    id: reproducir
+    attributes:
+      label: Cómo reproducirlo
+      value: |
+        1. 
+        2. 
+    validations:
+      required: true
+  - type: textarea
+    id: registros
+    attributes:
+      label: Errores / registros
+      description: Salida de SWI-Prolog o de la consola del navegador.
+      render: shell
+  - type: input
+    id: entorno
+    attributes:
+      label: Entorno
+      description: Versión de SWI-Prolog, consola o web, commit.
+      placeholder: "SWI-Prolog 10.0.2, web, a494660"

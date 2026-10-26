@@ -1,0 +1,60 @@
+name: Tarea
+description: Una célula de trabajo (1–4 h) con final claro
+title: "FX·NN tipo(área): "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Título: `F<fase>·<orden> tipo(área): descripción` — p. ej. `F1·03 feat(deduccion): generalizar el motor a N jugadores`.
+        Asigna el **milestone** de la fase y las etiquetas de tipo y área.
+  - type: textarea
+    id: objetivo
+    attributes:
+      label: Objetivo
+      description: Qué se consigue al terminar, en una o dos frases.
+    validations:
+      required: true
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Pasos
+      description: Checklist del paso a paso.
+      value: |
+        - [ ] 
+        - [ ] 
+    validations:
+      required: true
+  - type: textarea
+    id: hecho
+    attributes:
+      label: Criterio de "hecho"
+      description: Cómo compruebo que está terminado (algo que se pueda ver o medir).
+      value: |
+        - [ ] 
+    validations:
+      required: true
+  - type: dropdown
+    id: tamano
+    attributes:
+      label: Tamaño
+      options:
+        - S (≤ 1 h)
+        - M (1–3 h)
+        - L (medio día; si es más, divídela)
+    validations:
+      required: true
+  - type: input
+    id: depende
+    attributes:
+      label: Depende de
+      placeholder: "#12, #13"
+  - type: input
+    id: plan
+    attributes:
+      label: Referencia en PLAN.md
+      placeholder: "§4 La IA"
+  - type: textarea
+    id: notas
+    attributes:
+      label: Notas
