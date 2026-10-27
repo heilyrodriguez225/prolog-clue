@@ -12,7 +12,7 @@ Los oponentes son una IA escrita en Prolog. Cada jugada (quién mostró una cart
 
 ## Estado
 
-🚧 En desarrollo. Por ahora está el motor de deducción de la IA (`src/deduccion.pl`) con una demo.
+🚧 En desarrollo. Por ahora están el mazo y el reparto (`src/juego.pl`) y el motor de deducción de la IA (`src/deduccion.pl`), con una demo.
 
 ## Requisitos
 
@@ -24,15 +24,19 @@ Los oponentes son una IA escrita en Prolog. Cada jugada (quién mostró una cart
 swipl src/demo.pl
 ```
 
-Salida:
+Una partida de 21 cartas y 4 jugadores, vista por la IA del jugador 1 (fragmento de la salida):
 
 ```
-Probabilidad de que cada carta esté en el sobre:
-  blanco: 100.0 %
-  cuerda: 100.0 %
-  biblioteca: 100.0 %
+Soy la IA del jugador 1. Mis cartas: Chef Canela, Daga, Biblioteca, Cocina y Piscina.
+  En el sobre: [] · descartadas: 5 · dudosas: 16
+...
+Turno 5: Sugiero Señora Coral, Cuerda, Biblioteca (la biblioteca es mía). Nadie puede refutar.
+  En el sobre: [Señora Coral,Cuerda] · descartadas: 14 · dudosas: 5
+...
+Turno 7: Sugiero Chef Canela, Daga, Gimnasio (las dos primeras son mías). Nadie puede refutar.
+  En el sobre: [Señora Coral,Cuerda,Gimnasio] · descartadas: 18 · dudosas: 0
 
-La IA acusa: [blanco,cuerda,biblioteca]
+La IA acusa: fue Señora Coral, con Cuerda, en Gimnasio.
 ```
 
 La IA dedujo la solución sin haber visto esas cartas, solo a partir de quién refutó y quién no.

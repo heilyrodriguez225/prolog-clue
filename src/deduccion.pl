@@ -11,10 +11,12 @@
 
 :- module(deduccion,
           [ modelo/2,
-            tengo/3,
+            cuentas/2,
+            conocimiento_inicial/3,
             mostro/3,
             refuto/3,
             no_refuto/3,
+            estado_carta/3,
             probabilidades/2,
             solucion_segura/2
           ]).
@@ -24,17 +26,18 @@
 :- use_module(library(lists)).
 :- use_module(library(pairs)).
 :- use_module(library(aggregate)).
+:- use_module(juego, [carta/2]).
 
-sospechosos([mostaza, escarlata, prado, blanco]).
-armas([cuchillo, cuerda, pistola]).
-lugares([cocina, biblioteca, salon]).
+% Las cartas de un tipo, tomadas del mazo de juego.pl.
+cartas_de_tipo(Tipo, Cartas) :-
+    findall(C, carta(Tipo, C), Cartas).
 
 %!  modelo(+Reparto, -P) is det.
 %
 %   Crea el modelo de conocimiento. Reparto indica cuántas cartas tiene
-%   cada jugador, por ejemplo [3, 2, 2]. P es una lista Carta-Dueño.
+%   cada jugador, por ejemplo [5, 5, 4, 4]. P es una lista Carta-Dueño.
 modelo(Reparto, P) :-
-    sospechosos(S), armas(A), lugares(L),
+    maplist(cartas_de_tipo, [sospechoso, arma, lugar], [S, A, L]),
     append([S, A, L], Cartas),
     length(Reparto, NJ),
     same_length(Cartas, Ds),
@@ -44,6 +47,14 @@ modelo(Reparto, P) :-
     numlist(1, NJ, Js),
     pairs_keys_values(Cuentas, Js, Reparto),
     global_cardinality(Ds, [0-3|Cuentas]).
+
+%!  cuentas(+Partida, -Cuentas) is det.
+%
+%   Cuántas cartas tiene cada jugador, en orden: [5, 5, 4, 4]. Es
+%   información pública (se ve en la mesa); las cartas en sí, no.
+cuentas(partida(_, Manos, _, _, _), Cuentas) :-
+    pairs_values(Manos, ListasDeCartas),
+    maplist(length, ListasDeCartas, Cuentas).
 
 % Exactamente una carta de cada tipo está en el sobre.
 uno_en_sobre(P, Tipo) :-
@@ -55,23 +66,64 @@ en_sobre(P, C, B) :- dueno(P, C, D), B #<==> (D #= 0).
 es_de(P, J, C)    :- dueno(P, C, D), D #= J.
 no_es_de(P, J, C) :- dueno(P, C, D), D #\= J.
 
-%   Hechos observados durante la partida.
+%!  conocimiento_inicial(+Yo, +Partida, -K) is det.
+%
+%   K = conocimiento(Yo, P) es lo que sabe el jugador Yo al empezar: las
+%   reglas del juego, cuántas cartas tiene cada uno y su propia mano.
+%   Cada IA tiene el suyo, porque cada una ve cosas distintas.
+conocimiento_inicial(Yo, Partida, conocimiento(Yo, P)) :-
+    cuentas(Partida, Cuentas),
+    modelo(Cuentas, P),
+    mano(Partida, Yo, Mano),
+    tengo(P, Yo, Mano).
+
+mano(partida(_, Manos, _, _, _), J, Mano) :-
+    memberchk(J-Mano, Manos).
+
+%   Observaciones durante la partida: cada una añade restricciones al
+%   conocimiento K de quien la ve.
 %   Ojo: usar maplist y no forall, porque forall deshace las restricciones.
 
-tengo(P, J, Cartas)  :- maplist(es_de(P, J), Cartas).
-mostro(P, J, Carta)  :- es_de(P, J, Carta).
-no_refuto(P, J, Cs)  :- maplist(no_es_de(P, J), Cs).
+tengo(P, J, Cartas) :- maplist(es_de(P, J), Cartas).
+
+% Al dueño de K, el jugador J le enseñó Carta.
+mostro(conocimiento(_, P), J, Carta) :- es_de(P, J, Carta).
+
+% El jugador J no pudo refutar: no tiene ninguna de las tres cartas.
+no_refuto(conocimiento(_, P), J, Cs) :- maplist(no_es_de(P, J), Cs).
 
 % El jugador J refutó: tiene AL MENOS una de las tres cartas (no se sabe cuál).
-refuto(P, J, [A, B, C]) :-
+refuto(conocimiento(_, P), J, [A, B, C]) :-
     dueno(P, A, DA), dueno(P, B, DB), dueno(P, C, DC),
     (DA #= J) #\/ (DB #= J) #\/ (DC #= J).
 
-%!  probabilidades(+P, -Probs) is det.
+%!  estado_carta(+K, ?Carta, -Estado) is nondet.
+%
+%   Qué sabe el dueño de K sobre Carta, usando solo la propagación de
+%   CLP(FD), sin buscar. Es instantáneo con el mazo completo.
+%
+%       sobre       el dueño solo puede ser 0: está en el sobre
+%       descartada  el dueño no puede ser 0: la tiene algún jugador
+%       dudosa      todavía puede estar en el sobre o en un jugador
+%
+%   Es incompleto: hay deducciones que exigen buscar (ver #7).
+estado_carta(conocimiento(_, P), Carta, Estado) :-
+    member(Carta-D, P),
+    fd_inf(D, Min),
+    fd_sup(D, Max),
+    (   Max =:= 0 -> Estado = sobre
+    ;   Min > 0   -> Estado = descartada
+    ;   Estado = dudosa
+    ).
+
+%!  probabilidades(+K, -Probs) is det.
 %
 %   Probs es una lista Carta-Porcentaje con la probabilidad de que cada
 %   carta esté en el sobre, contando los mundos posibles.
-probabilidades(P, Probs) :-
+%
+%   Solo sirve para mazos pequeños: con 21 cartas hay millones de mundos
+%   y no termina. Se reemplaza en #7 y #8.
+probabilidades(conocimiento(_, P), Probs) :-
     pairs_values(P, Ds),
     findall(Ds, label(Ds), Mundos),
     length(Mundos, N),
@@ -83,10 +135,10 @@ probabilidades(P, Probs) :-
               Pct is 100.0 * K / N ),
             Probs).
 
-%!  solucion_segura(+P, -Solucion) is semidet.
+%!  solucion_segura(+K, -Solucion) is semidet.
 %
 %   Tiene éxito si la solución ya se puede deducir con certeza.
-solucion_segura(P, Solucion) :-
-    probabilidades(P, Probs),
+solucion_segura(K, Solucion) :-
+    probabilidades(K, Probs),
     findall(C, member(C-100.0, Probs), Solucion),
     length(Solucion, 3).
