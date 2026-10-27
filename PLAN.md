@@ -14,13 +14,49 @@ Basadas en Clue, simplificadas para que todo el esfuerzo vaya a la parte declara
 
 | Regla | Decisión |
 |---|---|
-| Mazo | 6 sospechosos, 6 armas, 9 lugares (21 cartas). Los nombres se deciden en F1·01 |
+| Mazo | 6 sospechosos, 6 armas, 9 lugares (21 cartas). Ver "Las cartas" |
 | Sobre | 1 carta de cada tipo, elegida al azar |
-| Jugadores | 1 humano + 2–4 IAs (3–5 en total). El resto de cartas se reparte lo más parejo posible |
+| Jugadores | 1 humano + 2–4 IAs (3–5 en total), **3 IAs por defecto**. Las 18 cartas restantes se reparten lo más parejo posible |
 | Tablero | **No hay tablero ni dados.** En su turno, cada jugador sugiere cualquier lugar |
 | Sugerencia | "Fue X con Y en Z". Se pregunta en orden a los siguientes jugadores; el primero que tenga alguna de las tres cartas enseña **una** solo a quien sugirió |
 | Lo que ven los demás | Quién refutó y quién no pudo, pero no la carta enseñada |
 | Acusación | Si acierta, gana. Si falla, queda eliminado pero sigue refutando |
+
+**Por qué 2–4 IAs:** con 4 jugadores cada uno tiene 4 o 5 cartas y la partida queda equilibrada. Con 6, las partidas se alargan, la IA difícil es más lenta (hay más respuestas posibles para cada sugerencia) y el torneo tiene muchas más combinaciones. El motor es genérico para N jugadores, así que ampliar a 5 IAs es cambiar un número.
+
+### Las cartas
+
+| Sospechosos (6) | Armas (6) | Lugares (9) |
+|---|---|---|
+| Chef Canela | Trofeo | Biblioteca |
+| Entrenador Cobalto | Veneno | Cocina |
+| Señora Coral | Cuerda | Sala de video |
+| Jardinero Verde | Daga | Piscina |
+| Doctora Violeta | Revólver | Comedor |
+| Señorita Perla | Tijeras | Estudio |
+| | | Bodega |
+| | | Gimnasio |
+| | | Jardín |
+
+En el código, cada carta es un átomo sin tildes ni espacios (`chef_canela`, `sala_de_video`…), y el nombre para mostrar se guarda aparte.
+
+### El estado de la partida
+
+El estado es un **término que se pasa de turno en turno**, sin `assert`:
+
+```prolog
+partida(Sobre, Manos, Turno, Eliminados, Historial)
+```
+
+| Argumento | Contenido |
+|---|---|
+| `Sobre` | `sobre(Sospechoso, Arma, Lugar)` |
+| `Manos` | Lista `Jugador-Cartas` |
+| `Turno` | Jugador al que le toca |
+| `Eliminados` | Jugadores que acusaron mal |
+| `Historial` | Lista de jugadas públicas: sugerencias, quién refutó y quién no pudo |
+
+Cada turno recibe el estado anterior y devuelve uno nuevo. **Por qué:** es más declarativo, se prueba fácilmente con tests y evita que `assert` pierda las restricciones CLP(FD) de la IA (al guardar un término con `assert` se copia sin sus restricciones). Solo el servidor web (F3) guarda la partida en curso con `assert` o `nb_setval`.
 
 ## §3 Arquitectura
 
