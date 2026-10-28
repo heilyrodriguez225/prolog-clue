@@ -41,6 +41,20 @@ La IA acusa: fue Señora Coral, con Cuerda, en Gimnasio.
 
 La IA dedujo la solución sin haber visto esas cartas, solo a partir de quién refutó y quién no.
 
+## Tests
+
+```bash
+swipl -q -g run_tests -t halt tests/todos.pl
+```
+
+Ejecuta los 43 tests (`tests/test_juego.pl` y `tests/test_deduccion.pl`, con [plunit](https://www.swi-prolog.org/pldoc/man?section=plunit)). Muestra el progreso, marca con `FAILED` los que fallen y termina con código 0 si todos pasan o con 1 si alguno falla (se comprueba con `echo $status` en fish, o `echo $?` en bash). Tarda poco más de un segundo.
+
+Para ejecutar solo un archivo:
+
+```bash
+swipl -q -g run_tests -t halt tests/test_deduccion.pl
+```
+
 ## Plan
 
 - [x] Motor de deducción con restricciones
