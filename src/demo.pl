@@ -61,16 +61,16 @@ jugar_turno(K, Texto-Obs, N, N1) :-
     N1 is N + 1.
 
 resumen(K) :-
-    findall(C, estado_carta(K, C, sobre), Sobre),
-    aggregate_all(count, estado_carta(K, _, descartada), NDesc),
-    aggregate_all(count, estado_carta(K, _, dudosa), NDud),
+    deducir(K, Estados),
+    findall(C, member(C-sobre, Estados), Sobre),
+    aggregate_all(count, member(_-descartada, Estados), NDesc),
+    aggregate_all(count, member(_-dudosa, Estados), NDud),
     maplist(nombre, Sobre, Nombres),
     format("  En el sobre: ~w · descartadas: ~w · dudosas: ~w~n", [Nombres, NDesc, NDud]).
 
 acusar(K) :-
-    findall(C, estado_carta(K, C, sobre), Sobre),
-    (   Sobre = [_, _, _]
-    ->  maplist(nombre, Sobre, [S, A, L]),
+    (   solucion_segura(K, sobre(S0, A0, L0))
+    ->  maplist(nombre, [S0, A0, L0], [S, A, L]),
         format("~nLa IA acusa: fue ~w, con ~w, en ~w.~n", [S, A, L])
     ;   writeln('\nTodavía no hay suficiente información para acusar.')
     ).

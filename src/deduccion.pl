@@ -17,6 +17,9 @@
             refuto/3,
             no_refuto/3,
             estado_carta/3,
+            puede_estar_en_sobre/2,
+            posibles_en_sobre/2,
+            deducir/2,
             probabilidades/2,
             solucion_segura/2
           ]).
@@ -116,13 +119,73 @@ estado_carta(conocimiento(_, P), Carta, Estado) :-
     ;   Estado = dudosa
     ).
 
+%!  puede_estar_en_sobre(+K, +Carta) is semidet.
+%
+%   Tiene éxito si existe AL MENOS UN mundo coherente con todo lo que
+%   sabe el dueño de K en el que Carta está en el sobre. Busca un solo
+%   mundo (once/1) en lugar de enumerarlos todos.
+%
+%   La doble negación \+ \+ comprueba sin dejar rastro: al terminar se
+%   deshacen D #= 0 y el etiquetado, y K queda como estaba.
+puede_estar_en_sobre(conocimiento(_, P), Carta) :-
+    dueno(P, Carta, D),
+    pairs_values(P, Ds),
+    \+ \+ ( D #= 0, once(labeling([ff], Ds)) ).
+
+%!  posibles_en_sobre(+K, -Cartas) is det.
+%
+%   Todas las cartas que, según el dueño de K, todavía pueden estar en
+%   el sobre.
+posibles_en_sobre(K, Cartas) :-
+    findall(C,
+            ( member(Tipo, [sospechoso, arma, lugar]),
+              posibles_de_tipo(K, Tipo, Posibles),
+              member(C, Posibles) ),
+            Cartas).
+
+%!  deducir(+K, -Estados) is det.
+%
+%   Estado de cada carta, con búsqueda además de propagación. Estados es
+%   una lista Carta-Estado:
+%
+%       sobre       es la única de su tipo que puede estar en el sobre
+%       descartada  no puede estar en el sobre
+%       dudosa      puede estar, y hay otras de su tipo que también
+%
+%   A diferencia de estado_carta/3, es completo: lo que se deduce, sale.
+deducir(K, Estados) :-
+    findall(C-E,
+            ( member(Tipo, [sospechoso, arma, lugar]),
+              posibles_de_tipo(K, Tipo, Posibles),
+              cartas_de_tipo(Tipo, Cartas),
+              member(C, Cartas),
+              clasificar(C, Posibles, E) ),
+            Estados).
+
+% Las cartas de un tipo que pueden estar en el sobre. Primero se miran
+% las que la propagación no descarta, para no buscar en vano.
+posibles_de_tipo(K, Tipo, Posibles) :-
+    cartas_de_tipo(Tipo, Cartas),
+    include(posible(K), Cartas, Posibles).
+
+posible(K, C) :-
+    estado_carta(K, C, E),
+    E \== descartada,
+    puede_estar_en_sobre(K, C).
+
+clasificar(C, Posibles, Estado) :-
+    (   \+ memberchk(C, Posibles) -> Estado = descartada
+    ;   Posibles = [_]            -> Estado = sobre
+    ;   Estado = dudosa
+    ).
+
 %!  probabilidades(+K, -Probs) is det.
 %
 %   Probs es una lista Carta-Porcentaje con la probabilidad de que cada
 %   carta esté en el sobre, contando los mundos posibles.
 %
-%   Solo sirve para mazos pequeños: con 21 cartas hay millones de mundos
-%   y no termina. Se reemplaza en #7 y #8.
+%   Solo sirve cuando quedan pocos mundos posibles: al empezar una
+%   partida de 21 cartas hay millones y no termina. Se reemplaza en #8.
 probabilidades(conocimiento(_, P), Probs) :-
     pairs_values(P, Ds),
     findall(Ds, label(Ds), Mundos),
@@ -135,10 +198,12 @@ probabilidades(conocimiento(_, P), Probs) :-
               Pct is 100.0 * K / N ),
             Probs).
 
-%!  solucion_segura(+K, -Solucion) is semidet.
+%!  solucion_segura(+K, -Sobre) is semidet.
 %
-%   Tiene éxito si la solución ya se puede deducir con certeza.
-solucion_segura(K, Solucion) :-
-    probabilidades(K, Probs),
-    findall(C, member(C-100.0, Probs), Solucion),
-    length(Solucion, 3).
+%   Tiene éxito si el dueño de K ya puede deducir con certeza la
+%   solución: de cada tipo queda exactamente una carta posible.
+%   Sobre es sobre(Sospechoso, Arma, Lugar).
+solucion_segura(K, sobre(S, A, L)) :-
+    posibles_de_tipo(K, sospechoso, [S]),
+    posibles_de_tipo(K, arma, [A]),
+    posibles_de_tipo(K, lugar, [L]).
