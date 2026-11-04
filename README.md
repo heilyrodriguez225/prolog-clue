@@ -47,7 +47,7 @@ La IA dedujo la solución sin haber visto esas cartas, solo a partir de quién r
 swipl -q -g run_tests -t halt tests/todos.pl
 ```
 
-Ejecuta los 53 tests (`tests/test_juego.pl` y `tests/test_deduccion.pl`, con [plunit](https://www.swi-prolog.org/pldoc/man?section=plunit)). Muestra el progreso, marca con `FAILED` los que fallen y termina con código 0 si todos pasan o con 1 si alguno falla (se comprueba con `echo $status` en fish, o `echo $?` en bash). Tarda unos 7 segundos (los tests de probabilidades generan muchos mundos al azar).
+Ejecuta los 83 tests (`tests/test_juego.pl`, `tests/test_deduccion.pl` y `tests/test_jugador.pl`, con [plunit](https://www.swi-prolog.org/pldoc/man?section=plunit)). Muestra el progreso, marca con `FAILED` los que fallen y termina con código 0 si todos pasan o con 1 si alguno falla (se comprueba con `echo $status` en fish, o `echo $?` en bash). Tarda unos 7 segundos (los tests de probabilidades generan muchos mundos al azar).
 
 Para ejecutar solo un archivo:
 

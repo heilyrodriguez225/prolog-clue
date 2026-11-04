@@ -11,3 +11,4 @@
 
 :- consult(test_juego).
 :- consult(test_deduccion).
+:- consult(test_jugador).

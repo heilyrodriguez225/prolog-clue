@@ -54,7 +54,7 @@ partida(Sobre, Manos, Turno, Eliminados, Historial)
 | `Manos` | Lista `Jugador-Cartas` |
 | `Turno` | Jugador al que le toca |
 | `Eliminados` | Jugadores que acusaron mal |
-| `Historial` | Lista de jugadas públicas: sugerencias, quién refutó y quién no pudo |
+| `Historial` | Lista, de la más antigua a la más reciente, de los eventos públicos: `sugerencia/3` y `acusacion/3` (ver §3) |
 
 Cada turno recibe el estado anterior y devuelve uno nuevo. **Por qué:** es más declarativo, se prueba fácilmente con tests y evita que `assert` pierda las restricciones CLP(FD) de la IA (al guardar un término con `assert` se copia sin sus restricciones). Solo el servidor web (F3) guarda la partida en curso con `assert` o `nb_setval`.
 
@@ -64,6 +64,7 @@ Cada turno recibe el estado anterior y devuelve uno nuevo. **Por qué:** es más
 src/
   juego.pl        cartas, reparto, estado de la partida y turnos
   deduccion.pl    conocimiento de cada IA como restricciones CLP(FD)
+  jugador.pl      los jugadores y el protocolo con el que juegan (ver abajo)
   ia.pl           niveles de IA: fácil, medio y difícil
   explicacion.pl  metaintérprete: por qué la IA sabe lo que sabe
   consola.pl      interfaz de texto
@@ -73,6 +74,77 @@ tests/            tests con plunit
 ```
 
 La interfaz web no tiene lógica de juego: solo muestra el estado y envía las acciones del jugador. **Todas las reglas y la IA viven en Prolog.**
+
+### El protocolo de jugador
+
+El bucle de la partida (`juego.pl`) solo habla con los jugadores mediante un **protocolo común**, sin saber de qué tipo es cada uno (humano, fácil, media o difícil).
+
+**Dos estados separados.** La partida (`partida/5`, ver §2) guarda lo que es verdad: el sobre, las manos y lo público. Los jugadores van en una **lista aparte**, que el bucle pasa de turno en turno:
+
+```prolog
+jugador(Id, Tipo, Memoria)
+```
+
+| Tipo | Memoria | Qué guarda |
+|---|---|---|
+| `humano` | `[]` | Nada: ve por la consola |
+| `facil` | `vistas(Cartas)` | Las cartas que ha visto |
+| `media`, `dificil` | `conocimiento(Yo, P)` | El modelo CLP(FD) de `deduccion.pl`, con sus restricciones |
+
+La memoria **nunca se guarda con `assert`** (se perderían las restricciones). Cada operación devuelve el jugador con la memoria actualizada.
+
+**Un jugador nunca recibe la partida.** Tendría el sobre y las manos de los demás. Recibe su **vista**, que extrae `vista_de/3`:
+
+```prolog
+vista(Mano, Eliminados, Historial)
+```
+
+**Las operaciones** (`jugador.pl`), cada una con una cláusula por tipo de jugador:
+
+| Operación | Cuándo | Devuelve |
+|---|---|---|
+| `elegir_accion(J, Vista, Accion, J1)` | Le toca jugar | `sugerir(S, A, L)` o `acusar(S, A, L)` |
+| `elegir_carta_a_mostrar(J, Sugerencia, Candidatas, Carta, J1)` | Tiene que refutar | Una de las `Candidatas`, que calcula el bucle y son las cartas de la sugerencia que tiene |
+| `observar(J, Evento, J1)` | Ocurre algo que puede ver | El jugador con la memoria actualizada |
+
+`Sugerencia` es `sugerencia(Quien, [S, A, L])`.
+
+**Los eventos.** Hay dos públicos y uno privado:
+
+| Evento | Tipo | Qué dice |
+|---|---|---|
+| `sugerencia(Quien, [S, A, L], Respuestas)` | Público | `Quien` sugiere. `Respuestas` son, en orden de turno, los jugadores a los que se preguntó: `no_pudo(J)` si no tenía ninguna de las tres cartas y, si alguien refutó, la lista termina con `refuto(J)` |
+| `acusacion(Quien, [S, A, L], Resultado)` | Público | `Resultado` es `acierta` o `falla` |
+| `carta_vista(Refutador, Carta)` | **Privado** | La carta que enseñó el `Refutador` |
+
+**Quién ve qué:**
+
+| Quién | Ve |
+|---|---|
+| **Todos los jugadores** | Cada `sugerencia` (quién, qué cartas, quién no pudo y quién refutó) y cada `acusacion` |
+| **Solo el que sugirió** | La `carta_vista` que le enseñaron |
+| **Nadie más** | Qué carta enseñó el refutador, ni el sobre, ni las manos ajenas |
+
+Se entregan con dos predicados que **hacen cumplir la regla**: `observar_todos/3` solo acepta eventos públicos y `observar_a/4` solo privados. Entregar mal un evento da un error, no un fallo silencioso.
+
+**El historial** (`Historial` en la partida) guarda solo los eventos públicos, de la más antigua a la más reciente. La `carta_vista` nunca entra.
+
+**Qué hace la IA con cada evento** (se implementa en las tareas de la fase 2):
+
+| Evento | Observación en `deduccion.pl` |
+|---|---|
+| `no_pudo(J)` de una sugerencia | `no_refuto(K, J, Cartas)` |
+| `refuto(J)` y no soy quien sugirió | `refuto(K, J, Cartas)`: tiene al menos una, no sé cuál |
+| `carta_vista(J, Carta)` | `mostro(K, J, Carta)` |
+
+**Cómo juega cada tipo** hoy (el protocolo ya funciona; el comportamiento propio llega con cada tarea):
+
+| Tipo | Hoy | Después |
+|---|---|---|
+| `humano` | Al azar | La consola (#12) |
+| `facil` | Al azar, recordando las cartas que le enseñan | Sugiere lo que no ha visto y acusa cuando puede (#13) |
+| `media` | Al azar | Deduce con restricciones (#14, #15) |
+| `dificil` | Al azar | Además elige la mejor sugerencia (#21) |
 
 ## §4 La IA
 
