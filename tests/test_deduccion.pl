@@ -32,6 +32,32 @@ partida_con_mano(Mano, Cuentas, partida(sobre(x, y, z), Manos, 1, [], [])) :-
 
 % ---- Ayudas ----------------------------------------------------------
 
+% La partida de la demo, turno a turno: la IA solo acusa al final.
+turnos_demo([ mostro(2, entrenador_cobalto),
+              refuto(3, [senora_coral, veneno, jardin]),
+              refuto(4, [doctora_violeta, tijeras, comedor]),
+              mostro(2, sala_de_video),
+              no_refuto(2, [senora_coral, cuerda, biblioteca]),
+              no_refuto(3, [senora_coral, cuerda, biblioteca]),
+              no_refuto(4, [senora_coral, cuerda, biblioteca]),
+              no_refuto(4, [doctora_violeta, veneno, gimnasio]),
+              no_refuto(2, [doctora_violeta, veneno, gimnasio]),
+              no_refuto(2, [chef_canela, daga, gimnasio]),
+              no_refuto(3, [chef_canela, daga, gimnasio]),
+              no_refuto(4, [chef_canela, daga, gimnasio]) ]).
+
+% El caso mínimo de la issue #7: 5 observaciones que la propagación sola no
+% aprovecha, pero la búsqueda sí. Se razona por conteo: ver Issue_07 de las notas.
+caso_minimo(K) :-
+    partida_con_mano([estudio, cuerda, bodega, piscina, tijeras, daga],
+                     [6, 6, 6], P),
+    conocimiento_inicial(1, P, K),
+    no_refuto(K, 3, [doctora_violeta, veneno, cocina]),
+    no_refuto(K, 3, [senora_coral, revolver, comedor]),
+    refuto(K, 2, [entrenador_cobalto, trofeo, jardin]),
+    mostro(K, 2, biblioteca),
+    mostro(K, 2, senorita_perla).
+
 estado(K, Carta, Estado) :- once(estado_carta(K, Carta, Estado)).
 
 aplicar(K, mostro(J, C))      :- mostro(K, J, C).
@@ -154,20 +180,6 @@ test(al_saber_el_sobre_las_otras_18_quedan_descartadas) :-
 
 :- begin_tests(demo).
 
-% La partida de la demo, turno a turno: la IA solo acusa al final.
-turnos_demo([ mostro(2, entrenador_cobalto),
-              refuto(3, [senora_coral, veneno, jardin]),
-              refuto(4, [doctora_violeta, tijeras, comedor]),
-              mostro(2, sala_de_video),
-              no_refuto(2, [senora_coral, cuerda, biblioteca]),
-              no_refuto(3, [senora_coral, cuerda, biblioteca]),
-              no_refuto(4, [senora_coral, cuerda, biblioteca]),
-              no_refuto(4, [doctora_violeta, veneno, gimnasio]),
-              no_refuto(2, [doctora_violeta, veneno, gimnasio]),
-              no_refuto(2, [chef_canela, daga, gimnasio]),
-              no_refuto(3, [chef_canela, daga, gimnasio]),
-              no_refuto(4, [chef_canela, daga, gimnasio]) ]).
-
 test(la_ia_acierta_el_sobre_al_final) :-
     partida_demo(P), P = partida(Sobre, _, _, _, _),
     conocimiento_inicial(1, P, K),
@@ -216,18 +228,6 @@ test(deducir_clasifica_las_21_cartas) :-
     deducir(K, Estados),
     length(Estados, 21),
     forall(member(_-E, Estados), memberchk(E, [sobre, descartada, dudosa])).
-
-% El caso mínimo de la issue #7: 5 observaciones que la propagación sola no
-% aprovecha, pero la búsqueda sí. Se razona por conteo: ver Issue_07 de las notas.
-caso_minimo(K) :-
-    partida_con_mano([estudio, cuerda, bodega, piscina, tijeras, daga],
-                     [6, 6, 6], P),
-    conocimiento_inicial(1, P, K),
-    no_refuto(K, 3, [doctora_violeta, veneno, cocina]),
-    no_refuto(K, 3, [senora_coral, revolver, comedor]),
-    refuto(K, 2, [entrenador_cobalto, trofeo, jardin]),
-    mostro(K, 2, biblioteca),
-    mostro(K, 2, senorita_perla).
 
 test(caso_minimo_la_propagacion_sola_se_queda_corta) :-
     caso_minimo(K),
@@ -290,3 +290,125 @@ test(el_sobre_real_nunca_se_descarta, [forall(member(N, [3, 4, 5]))]) :-
              memberchk(S, Posibles), memberchk(A, Posibles), memberchk(L, Posibles) )).
 
 :- end_tests(la_ia_nunca_se_equivoca).
+
+:- begin_tests(probabilidades).
+
+% Suma de los porcentajes de las cartas de un tipo.
+suma_del_tipo(Probs, Tipo, Suma) :-
+    findall(P, ( member(C-P, Probs), carta(Tipo, C) ), Ps),
+    sum_list(Ps, Suma).
+
+% Error medio entre dos listas de probabilidades (en puntos porcentuales).
+error_medio(Probs, Exactas, Error) :-
+    findall(E, ( member(C-PE, Exactas), memberchk(C-P, Probs), E is abs(P - PE) ), Es),
+    sum_list(Es, S), length(Es, N), Error is S / N.
+
+% La IA de la demo tras las primeras `N` observaciones.
+demo_tras(N, K) :-
+    partida_demo(P), conocimiento_inicial(1, P, K),
+    turnos_demo(Obs),
+    length(Primeras, N), append(Primeras, _, Obs),
+    aplicar_todas(K, Primeras).
+
+% -- Pocos mundos: el resultado es exacto ------------------------------
+
+test(pocos_mundos_el_resultado_es_exacto) :-
+    caso_minimo(K),
+    probabilidades(K, Probs),
+    probabilidades_exactas(K, Exactas),
+    Probs == Exactas.
+
+test(caso_minimo_seis_cartas_al_50_por_ciento) :-
+    caso_minimo(K),
+    probabilidades(K, Probs),
+    forall(member(C-P, Probs),
+           (   memberchk(C, [cocina, comedor, doctora_violeta, revolver, senora_coral, veneno])
+           ->  P =:= 50.0
+           ;   P =:= 0.0 )).
+
+% -- Con la solución segura, 100 % y 0 % -------------------------------
+
+test(con_la_solucion_segura_el_sobre_vale_100) :-
+    demo_tras(12, K),
+    probabilidades(K, Probs),
+    forall(member(C-P, Probs),
+           (   memberchk(C, [senora_coral, cuerda, gimnasio])
+           ->  P =:= 100.0
+           ;   P =:= 0.0 )).
+
+% -- Muchos mundos: se estima --------------------------------------------
+
+test(las_21_cartas_y_cada_tipo_suma_100) :-
+    demo_tras(0, K),
+    probabilidades(K, Probs),
+    length(Probs, 21),
+    forall(member(Tipo, [sospechoso, arma, lugar]),
+           ( suma_del_tipo(Probs, Tipo, Suma),
+             abs(Suma - 100.0) < 0.000001 )).
+
+test(la_propia_mano_vale_cero) :-
+    demo_tras(0, K),
+    probabilidades(K, Probs),
+    forall(member(C, [chef_canela, daga, biblioteca, cocina, piscina]),
+           ( memberchk(C-P, Probs), P =:= 0.0 )).
+
+test(al_empezar_se_parece_al_valor_exacto) :-
+    % Al empezar, cada carta desconocida de un tipo es igual de probable:
+    % 1 entre las que quedan de ese tipo (5 sospechosos, 5 armas, 6 lugares).
+    set_random(seed(11)),
+    demo_tras(0, K),
+    probabilidades(K, 400, Probs),
+    forall(( member(C-P, Probs), P > 0 ),
+           (   carta(Tipo, C),
+               tipo_desconocidas(Tipo, N),
+               Esperado is 100.0 / N,
+               abs(P - Esperado) < 8.0 )).
+
+tipo_desconocidas(sospechoso, 5).
+tipo_desconocidas(arma, 5).
+tipo_desconocidas(lugar, 6).
+
+test(las_cartas_descartadas_valen_cero) :-
+    % Ningún mundo estimado puede contradecir lo que la IA sabe.
+    forall(member(N, [4, 7, 8]),
+           ( demo_tras(N, K),
+             probabilidades(K, Probs),
+             forall(estado_carta(K, C, descartada),
+                    ( memberchk(C-P, Probs), P =:= 0.0 )),
+             forall(estado_carta(K, C, sobre),
+                    ( memberchk(C-P, Probs), P =:= 100.0 )) )).
+
+test(con_unos_cientos_de_mundos_el_error_medio_es_pequenio) :-
+    % Tras 9 observaciones quedan 1710 mundos: se estiman, y se comparan
+    % con los porcentajes exactos, que todavía se pueden calcular.
+    set_random(seed(5)),
+    demo_tras(9, K),
+    probabilidades(K, Estimadas),
+    probabilidades_exactas(K, Exactas),
+    error_medio(Estimadas, Exactas, Error),
+    Error < 3.0.
+
+test(misma_semilla_mismo_resultado) :-
+    demo_tras(0, K1), demo_tras(0, K2),
+    set_random(seed(3)), probabilidades(K1, P1),
+    set_random(seed(3)), probabilidades(K2, P2),
+    P1 == P2.
+
+test(mas_muestras_mas_precision) :-
+    % Con una sola estimación el azar puede dar la razón al método peor;
+    % por eso se promedia el error de varias semillas.
+    demo_tras(9, K),
+    probabilidades_exactas(K, Exactas),
+    findall(E1-E2,
+            ( member(Semilla, [9, 10, 11, 12]),
+              set_random(seed(Semilla)), probabilidades(K, 30, Pocas),
+              set_random(seed(Semilla)), probabilidades(K, 600, Muchas),
+              error_medio(Pocas, Exactas, E1),
+              error_medio(Muchas, Exactas, E2) ),
+            Errores),
+    pairs_keys_values(Errores, Es1, Es2),
+    sum_list(Es1, ConPocas),
+    sum_list(Es2, ConMuchas),
+    ConMuchas < ConPocas.
+
+:- end_tests(probabilidades).

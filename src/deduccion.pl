@@ -21,6 +21,8 @@
             posibles_en_sobre/2,
             deducir/2,
             probabilidades/2,
+            probabilidades/3,
+            probabilidades_exactas/2,
             solucion_segura/2
           ]).
 
@@ -29,6 +31,8 @@
 :- use_module(library(lists)).
 :- use_module(library(pairs)).
 :- use_module(library(aggregate)).
+:- use_module(library(random)).
+:- use_module(library(solution_sequences)).
 :- use_module(juego, [carta/2]).
 
 % Las cartas de un tipo, tomadas del mazo de juego.pl.
@@ -179,24 +183,150 @@ clasificar(C, Posibles, Estado) :-
     ;   Estado = dudosa
     ).
 
-%!  probabilidades(+K, -Probs) is det.
+%!  probabilidades(+K, -Probs) is semidet.
+%!  probabilidades(+K, +NMuestras, -Probs) is semidet.
 %
-%   Probs es una lista Carta-Porcentaje con la probabilidad de que cada
-%   carta esté en el sobre, contando los mundos posibles.
+%   Probs es una lista Carta-Porcentaje, con las 21 cartas: la
+%   probabilidad de que cada una esté en el sobre según el dueño de K.
+%   Falla si K es contradictorio (no queda ningún mundo posible).
 %
-%   Solo sirve cuando quedan pocos mundos posibles: al empezar una
-%   partida de 21 cartas hay millones y no termina. Se reemplaza en #8.
-probabilidades(conocimiento(_, P), Probs) :-
+%   Es un método híbrido:
+%
+%       - si quedan pocos mundos posibles, los enumera todos y el
+%         resultado es exacto;
+%       - si no (al empezar hay millones), los estima con NMuestras
+%         mundos elegidos al azar por muestrear/3.
+probabilidades(K, Probs) :-
+    muestras_por_defecto(N),
+    probabilidades(K, N, Probs).
+
+probabilidades(K, NMuestras, Probs) :-
+    limite_exacto(Limite),
+    (   mundos_si_pocos(K, Limite, Mundos)
+    ->  true
+    ;   muestrear(K, NMuestras, Mundos)
+    ),
+    Mundos = [_|_],
+    frecuencias(Mundos, Probs).
+
+%!  probabilidades_exactas(+K, -Probs) is semidet.
+%
+%   Igual que probabilidades/2, pero enumerando siempre todos los mundos.
+%   Solo termina cuando quedan pocos; sirve para comparar y para los tests.
+probabilidades_exactas(K, Probs) :-
+    findall(Sobre, mundo(K, Sobre), Mundos),
+    Mundos = [_|_],
+    frecuencias(Mundos, Probs).
+
+% Parámetros del método híbrido.
+muestras_por_defecto(250).
+limite_exacto(500).
+pasos_entre_muestras(10).
+pasos_de_calentamiento(100).
+
+% Un mundo posible, dado por las tres cartas que hay en el sobre.
+mundo(conocimiento(_, P), Sobre) :-
     pairs_values(P, Ds),
-    findall(Ds, label(Ds), Mundos),
+    label(Ds),
+    cartas_en_sobre(P, Sobre).
+
+cartas_en_sobre(P, Sobre) :-
+    findall(C, member(C-0, P), Sobre).
+
+% Mundos posibles, si hay Limite o menos. Falla si hay más.
+mundos_si_pocos(K, Limite, Mundos) :-
+    Maximo is Limite + 1,
+    findall(S, limit(Maximo, mundo(K, S)), Mundos),
     length(Mundos, N),
-    N > 0,
+    N =< Limite.
+
+% Porcentaje de mundos en los que cada carta está en el sobre.
+frecuencias(Mundos, Probs) :-
+    length(Mundos, N),
     findall(C-Pct,
-            ( nth1(I, P, C-_),
-              aggregate_all(count, (member(M, Mundos), nth1(I, M, 0)), K),
-              K > 0,
+            ( carta(_, C),
+              aggregate_all(count, (member(M, Mundos), memberchk(C, M)), K),
               Pct is 100.0 * K / N ),
             Probs).
+
+%!  muestrear(+K, +N, -Mundos) is semidet.
+%
+%   Mundos son N mundos posibles (cada uno, las 3 cartas del sobre)
+%   obtenidos con una cadena de Markov (Metropolis-Hastings).
+%
+%   Se parte de un mundo cualquiera y se va cambiando de mundo
+%   intercambiando el dueño de dos cartas. El cambio solo se acepta si
+%   el nuevo mundo cumple todas las restricciones de K: se comprueba
+%   unificando las variables con él. Como la propuesta es simétrica y
+%   solo se rechazan mundos imposibles, a la larga todos los mundos
+%   posibles son igual de probables.
+muestrear(conocimiento(_, P), N, Mundos) :-
+    pairs_values(P, Ds),
+    pairs_keys(P, Cartas),
+    maplist(tipo_de_carta, Cartas, Tipos),
+    random_between(1, 1000000, Semilla),
+    findall(Ds,
+            once(labeling([random_variable(Semilla), random_value(Semilla)], Ds)),
+            [Mundo0]),
+    pasos_de_calentamiento(Calentamiento),
+    avanzar(Calentamiento, Ds, Tipos, Mundo0, Mundo1),
+    recoger(N, Ds, Tipos, P, Mundo1, Mundos).
+
+tipo_de_carta(Carta, Tipo) :- once(carta(Tipo, Carta)).
+
+recoger(0, _, _, _, _, []) :- !.
+recoger(N, Ds, Tipos, P, Mundo0, [Sobre|Sobres]) :-
+    pasos_entre_muestras(Pasos),
+    avanzar(Pasos, Ds, Tipos, Mundo0, Mundo),
+    pairs_keys(P, Cartas),
+    findall(C, (nth1(I, Mundo, 0), nth1(I, Cartas, C)), Sobre),
+    N1 is N - 1,
+    recoger(N1, Ds, Tipos, P, Mundo, Sobres).
+
+% Da Pasos pasos de la cadena, partiendo del mundo Mundo0.
+avanzar(0, _, _, Mundo, Mundo) :- !.
+avanzar(Pasos, Ds, Tipos, Mundo0, Mundo) :-
+    (   maybe
+    ->  proponer_cambio_en_sobre(Mundo0, Tipos, I, J)
+    ;   proponer_cambio(Mundo0, I, J)
+    ),
+    (   nonvar(J),
+        intercambiar(Mundo0, I, J, Candidato),
+        \+ \+ Ds = Candidato          % ¿cumple todas las restricciones?
+    ->  Mundo1 = Candidato
+    ;   Mundo1 = Mundo0
+    ),
+    Pasos1 is Pasos - 1,
+    avanzar(Pasos1, Ds, Tipos, Mundo1, Mundo).
+
+% Dos cartas con distinto dueño, al azar.
+proponer_cambio(Mundo, I, J) :-
+    length(Mundo, L),
+    random_between(1, L, I),
+    nth1(I, Mundo, DuenoI),
+    findall(X, (nth1(X, Mundo, D), D =\= DuenoI), Candidatas),
+    (   Candidatas = [] -> true ; random_member(J, Candidatas) ).
+
+% Una carta del sobre y otra de su mismo tipo que no está en el sobre.
+% Sin estos cambios el sobre casi nunca se movería: un cambio al azar
+% pocas veces cae en una carta del sobre y otra de su tipo.
+proponer_cambio_en_sobre(Mundo, Tipos, I, J) :-
+    findall(X, nth1(X, Mundo, 0), EnSobre),
+    random_member(I, EnSobre),
+    nth1(I, Tipos, Tipo),
+    findall(X, ( nth1(X, Mundo, D), D =\= 0, nth1(X, Tipos, Tipo) ), Candidatas),
+    (   Candidatas = [] -> true ; random_member(J, Candidatas) ).
+
+% Mundo con los dueños de las cartas I y J intercambiados.
+intercambiar(Mundo, I, J, Candidato) :-
+    nth1(I, Mundo, DuenoI),
+    nth1(J, Mundo, DuenoJ),
+    findall(D,
+            ( nth1(X, Mundo, D0),
+              (   X =:= I -> D = DuenoJ
+              ;   X =:= J -> D = DuenoI
+              ;   D = D0 ) ),
+            Candidato).
 
 %!  solucion_segura(+K, -Sobre) is semidet.
 %
