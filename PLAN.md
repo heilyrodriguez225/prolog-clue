@@ -62,9 +62,10 @@ Cada turno recibe el estado anterior y devuelve uno nuevo. **Por qué:** es más
 
 ```
 src/
-  juego.pl        cartas, reparto, estado de la partida y turnos
+  juego.pl        cartas, reparto y partida nueva
   deduccion.pl    conocimiento de cada IA como restricciones CLP(FD)
   jugador.pl      los jugadores y el protocolo con el que juegan (ver abajo)
+  turnos.pl       el bucle de la partida: turnos, sugerencias, acusaciones y fin
   ia.pl           niveles de IA: fácil, medio y difícil
   explicacion.pl  metaintérprete: por qué la IA sabe lo que sabe
   consola.pl      interfaz de texto
@@ -74,6 +75,14 @@ tests/            tests con plunit
 ```
 
 La interfaz web no tiene lógica de juego: solo muestra el estado y envía las acciones del jugador. **Todas las reglas y la IA viven en Prolog.**
+
+**Dependencias entre módulos.** Cada uno importa solo a los de su izquierda, para que no haya ciclos:
+
+```
+juego.pl  ←  deduccion.pl  ←  jugador.pl  ←  turnos.pl
+```
+
+Por eso el bucle de la partida no vive en `juego.pl`: `jugador.pl` ya importa `juego.pl` (para las cartas) y el bucle necesita importar `jugador.pl`.
 
 ### El protocolo de jugador
 
@@ -145,6 +154,22 @@ Se entregan con dos predicados que **hacen cumplir la regla**: `observar_todos/3
 | `facil` | Al azar, recordando las cartas que le enseñan | Sugiere lo que no ha visto y acusa cuando puede (#13) |
 | `media` | Al azar | Deduce con restricciones (#14, #15) |
 | `dificil` | Al azar | Además elige la mejor sugerencia (#21) |
+
+### El bucle de la partida (`turnos.pl`)
+
+`jugar(Partida, Jugadores, Resultado)` juega una partida de principio a fin como una **recursión**: cada llamada hace un turno y se vuelve a llamar con el estado nuevo, sin `assert` ni estado global.
+
+En cada turno:
+
+1. Si queda un solo jugador sin eliminar, gana (`ultimo`).
+2. Si no, se le pide su acción al jugador al que le toca (`accion_del_turno/4`): recibe solo su vista y la acción se valida.
+3. **Sugerir:** se pregunta en orden circular a los demás, también a los eliminados; el primero que tenga alguna de las tres cartas refuta y se deja de preguntar. El evento `sugerencia/3` va a todos y al historial; la `carta_vista/2`, solo al que sugirió.
+4. **Acusar:** si coincide con el sobre gana (`acierta`). Si no, queda eliminado (sigue refutando, pero ya no juega turno). El evento `acusacion/3` va a todos y al historial.
+5. El turno pasa al siguiente jugador en círculo que no esté eliminado.
+
+El resultado es `fin(Ganador, Motivo, Partida, Jugadores)`, con el estado final y el historial completo.
+
+El bucle **solo** habla con los jugadores mediante el protocolo de arriba. No usa `deduccion.pl`, no consulta la memoria de nadie y no guarda estado global; los tests lo comprueban leyendo el código del módulo.
 
 ## §4 La IA
 

@@ -12,7 +12,7 @@ Los oponentes son una IA escrita en Prolog. Cada jugada (quién mostró una cart
 
 ## Estado
 
-🚧 En desarrollo. Por ahora están el mazo y el reparto (`src/juego.pl`) y el motor de deducción de la IA (`src/deduccion.pl`), con una demo.
+🚧 En desarrollo. Ya están el mazo y el reparto (`src/juego.pl`), el motor de deducción de la IA (`src/deduccion.pl`), los jugadores y su protocolo (`src/jugador.pl`) y el bucle de la partida (`src/turnos.pl`). Falta la interfaz para jugar.
 
 ## Requisitos
 
@@ -47,7 +47,7 @@ La IA dedujo la solución sin haber visto esas cartas, solo a partir de quién r
 swipl -q -g run_tests -t halt tests/todos.pl
 ```
 
-Ejecuta los 83 tests (`tests/test_juego.pl`, `tests/test_deduccion.pl` y `tests/test_jugador.pl`, con [plunit](https://www.swi-prolog.org/pldoc/man?section=plunit)). Muestra el progreso, marca con `FAILED` los que fallen y termina con código 0 si todos pasan o con 1 si alguno falla (se comprueba con `echo $status` en fish, o `echo $?` en bash). Tarda unos 7 segundos (los tests de probabilidades generan muchos mundos al azar).
+Ejecuta los 179 tests (`tests/test_juego.pl`, `tests/test_deduccion.pl`, `tests/test_jugador.pl` y `tests/test_turnos.pl`, con [plunit](https://www.swi-prolog.org/pldoc/man?section=plunit)). Muestra el progreso, marca con `FAILED` los que fallen y termina con código 0 si todos pasan o con 1 si alguno falla (se comprueba con `echo $status` en fish, o `echo $?` en bash). Tarda unos 11 segundos (los tests de probabilidades y las partidas completas generan mucho azar).
 
 Para ejecutar solo un archivo:
 

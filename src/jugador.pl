@@ -120,6 +120,10 @@ vista_de(Id, partida(_, Manos, _, Eliminados, Historial),
 %   un sospechoso, un arma y un lugar.
 
 elegir_accion(Jugador, Vista, Accion, Jugador1) :-
+    (   Vista = vista(_, _, _)
+    ->  true
+    ;   type_error(vista, Vista)       % p. ej. si alguien le pasa la partida
+    ),
     Jugador = jugador(_, Tipo, _),
     elige_accion(Tipo, Jugador, Vista, Accion, Jugador1).
 

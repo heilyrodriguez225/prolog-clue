@@ -124,6 +124,11 @@ test(elegir_accion_da_sugerir_o_acusar_con_tres_cartas_validas,
              memberchk(Que, [sugerir, acusar]),
              carta(sospechoso, S), carta(arma, A), carta(lugar, L) )).
 
+test(elegir_accion_rechaza_que_le_pasen_la_partida,
+     [error(type_error(vista, partida(_, _, _, _, _)))]) :-
+    partida_de_prueba(P), nuevo_jugador(1, media, P, J),
+    elegir_accion(J, P, _, _).
+
 test(elegir_accion_a_veces_sugiere_y_a_veces_acusa) :-
     set_random(seed(4)),
     partida_de_prueba(P), nuevo_jugador(1, facil, P, J),
