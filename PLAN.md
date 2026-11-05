@@ -66,7 +66,7 @@ src/
   deduccion.pl    conocimiento de cada IA como restricciones CLP(FD)
   jugador.pl      los jugadores y el protocolo con el que juegan (ver abajo)
   turnos.pl       el bucle de la partida: turnos, sugerencias, acusaciones y fin
-  ia.pl           niveles de IA: fácil, medio y difícil
+  ia.pl           lo que decide cada nivel de IA, sobre listas de cartas
   explicacion.pl  metaintérprete: por qué la IA sabe lo que sabe
   consola.pl      interfaz de texto
   servidor.pl     API HTTP/JSON (library(http))
@@ -79,14 +79,14 @@ La interfaz web no tiene lógica de juego: solo muestra el estado y envía las a
 **Dependencias entre módulos.** Cada uno importa solo a los de su izquierda, para que no haya ciclos:
 
 ```
-juego.pl  ←  deduccion.pl  ←  jugador.pl  ←  turnos.pl
+juego.pl  ←  deduccion.pl  ←  ia.pl  ←  jugador.pl  ←  turnos.pl
 ```
 
 Por eso el bucle de la partida no vive en `juego.pl`: `jugador.pl` ya importa `juego.pl` (para las cartas) y el bucle necesita importar `jugador.pl`.
 
 ### El protocolo de jugador
 
-El bucle de la partida (`juego.pl`) solo habla con los jugadores mediante un **protocolo común**, sin saber de qué tipo es cada uno (humano, fácil, media o difícil).
+El bucle de la partida (`juego.pl`) solo habla con los jugadores mediante un **protocolo común**, sin saber de qué tipo es cada uno (azar, humano, fácil, media o difícil).
 
 **Dos estados separados.** La partida (`partida/5`, ver §2) guarda lo que es verdad: el sobre, las manos y lo público. Los jugadores van en una **lista aparte**, que el bucle pasa de turno en turno:
 
@@ -96,7 +96,7 @@ jugador(Id, Tipo, Memoria)
 
 | Tipo | Memoria | Qué guarda |
 |---|---|---|
-| `humano` | `[]` | Nada: ve por la consola |
+| `azar`, `humano` | `[]` | Nada: el humano ve por la consola y el de azar no aprende |
 | `facil` | `vistas(Cartas)` | Las cartas que ha visto |
 | `media`, `dificil` | `conocimiento(Yo, P)` | El modelo CLP(FD) de `deduccion.pl`, con sus restricciones |
 
@@ -150,8 +150,9 @@ Se entregan con dos predicados que **hacen cumplir la regla**: `observar_todos/3
 
 | Tipo | Hoy | Después |
 |---|---|---|
+| `azar` | Al azar, siempre | (es el nivel más bajo, la referencia con la que comparar a los demás) |
 | `humano` | Al azar | La consola (#12) |
-| `facil` | Al azar, recordando las cartas que le enseñan | Sugiere lo que no ha visto y acusa cuando puede (#13) |
+| `facil` | **Hecho (#13):** recuerda las cartas que le enseñan, sugiere entre las que no ha visto y acusa cuando le queda una sola de cada tipo | |
 | `media` | Al azar | Deduce con restricciones (#14, #15) |
 | `dificil` | Al azar | Además elige la mejor sugerencia (#21) |
 
@@ -187,7 +188,7 @@ El bucle **solo** habla con los jugadores mediante el protocolo de arriba. No us
 
 | Nivel | Comportamiento |
 |---|---|
-| Fácil | Sugiere al azar y solo recuerda las cartas que le enseñaron |
+| Fácil | Sugiere al azar entre las cartas que no ha visto, solo recuerda las que le enseñan y acusa cuando le queda una sola de cada tipo |
 | Medio | Deduce con todas las restricciones y acusa cuando la solución es segura |
 | Difícil | Además elige la sugerencia que más reduce la incertidumbre (ganancia de información) |
 

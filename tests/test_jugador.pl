@@ -16,9 +16,9 @@ partida_de_prueba(partida(sobre(senora_coral, cuerda, gimnasio),
 
 :- begin_tests(tipos).
 
-test(hay_cuatro_tipos) :-
+test(hay_cinco_tipos) :-
     findall(T, tipo_de_jugador(T), Tipos),
-    Tipos == [humano, facil, media, dificil].
+    Tipos == [humano, facil, media, dificil, azar].
 
 :- end_tests(tipos).
 
@@ -41,7 +41,7 @@ test(la_ia_media_empieza_con_su_conocimiento, [forall(member(Tipo, [media, dific
     msort(Descartadas, D),
     msort([doctora_violeta, veneno, estudio, bodega], D).
 
-test(un_tipo_desconocido_da_error, [error(type_error(oneof([humano, facil, media, dificil]), robot))]) :-
+test(un_tipo_desconocido_da_error, [error(type_error(oneof([humano, facil, media, dificil, azar]), robot))]) :-
     partida_de_prueba(P),
     nuevo_jugador(1, robot, P, _).
 
@@ -115,7 +115,7 @@ test(la_vista_no_contiene_el_sobre_ni_las_manos_ajenas) :-
 vista_vacia(vista([], [], [])).
 
 test(elegir_accion_da_sugerir_o_acusar_con_tres_cartas_validas,
-     [forall(member(Tipo, [humano, facil, media, dificil]))]) :-
+     [forall(member(Tipo, [humano, facil, media, dificil, azar]))]) :-
     partida_de_prueba(P), nuevo_jugador(1, Tipo, P, J),
     vista_vacia(V),
     forall(between(1, 60, _),
@@ -131,7 +131,7 @@ test(elegir_accion_rechaza_que_le_pasen_la_partida,
 
 test(elegir_accion_a_veces_sugiere_y_a_veces_acusa) :-
     set_random(seed(4)),
-    partida_de_prueba(P), nuevo_jugador(1, facil, P, J),
+    partida_de_prueba(P), nuevo_jugador(1, azar, P, J),
     vista_vacia(V),
     findall(Que, ( between(1, 200, _), elegir_accion(J, V, A, _), functor(A, Que, 3) ), Quees),
     memberchk(sugerir, Quees),
@@ -140,7 +140,7 @@ test(elegir_accion_a_veces_sugiere_y_a_veces_acusa) :-
     NSugerir > 150.
 
 test(elegir_carta_ensenia_una_de_las_candidatas,
-     [forall(member(Tipo, [humano, facil, media, dificil]))]) :-
+     [forall(member(Tipo, [humano, facil, media, dificil, azar]))]) :-
     partida_de_prueba(P), nuevo_jugador(2, Tipo, P, J),
     Candidatas = [trofeo, comedor],
     forall(between(1, 40, _),
@@ -153,7 +153,7 @@ test(con_una_sola_candidata_ensenia_esa, [true(Carta == trofeo)]) :-
     elegir_carta_a_mostrar(J, sugerencia(1, [chef_canela, trofeo, cocina]), [trofeo], Carta, _).
 
 test(las_operaciones_devuelven_al_mismo_jugador_con_su_id_y_tipo,
-     [forall(member(Tipo, [humano, facil, media, dificil]))]) :-
+     [forall(member(Tipo, [humano, facil, media, dificil, azar]))]) :-
     partida_de_prueba(P), nuevo_jugador(2, Tipo, P, J),
     vista_vacia(V),
     elegir_accion(J, V, _, J1),

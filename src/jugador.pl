@@ -5,11 +5,11 @@
         jugador(Id, Tipo, Memoria)
 
     - Id es el número de jugador (1 es el humano).
-    - Tipo es humano, facil, media o dificil.
+    - Tipo es azar, humano, facil, media o dificil.
     - Memoria es lo que ese jugador sabe y los demás no. Su forma
       depende del tipo:
 
-          humano          []
+          azar, humano    []
           facil           vistas(Cartas)   las cartas que ha visto
           media, dificil  K                el conocimiento de deduccion.pl,
                                            con sus restricciones CLP(FD)
@@ -38,6 +38,7 @@
 :- use_module(library(lists)).
 :- use_module(library(random)).
 :- use_module(deduccion).
+:- use_module(ia).
 :- use_module(juego, [carta/2]).
 
 %!  tipo_de_jugador(?Tipo) is nondet.
@@ -48,6 +49,7 @@ tipo_de_jugador(humano).
 tipo_de_jugador(facil).
 tipo_de_jugador(media).
 tipo_de_jugador(dificil).
+tipo_de_jugador(azar).
 
 %!  nuevo_jugador(+Id, +Tipo, +Partida, -Jugador) is det.
 %
@@ -55,10 +57,11 @@ tipo_de_jugador(dificil).
 %   empieza: solo lo que puede saber al principio (su propia mano).
 
 nuevo_jugador(Id, Tipo, Partida, jugador(Id, Tipo, Memoria)) :-
-    must_be(oneof([humano, facil, media, dificil]), Tipo),
+    must_be(oneof([humano, facil, media, dificil, azar]), Tipo),
     memoria_inicial(Tipo, Id, Partida, Memoria).
 
 memoria_inicial(humano, _, _, []).
+memoria_inicial(azar, _, _, []).
 memoria_inicial(facil, Id, Partida, vistas(Mano)) :-
     mano_de(Id, Partida, Mano).
 memoria_inicial(media, Id, Partida, K) :-
@@ -149,35 +152,38 @@ observar(Jugador, Evento, Jugador1) :-
 %   Un predicado por operación, con una cláusula por tipo de jugador
 %   (Prolog elige la cláusula por el primer argumento).
 %
-%   POR AHORA todos los tipos juegan al azar y no aprenden nada: es lo
-%   justo para que el bucle de la partida funcione. Cada tipo recibirá su
-%   comportamiento propio en las tareas siguientes:
+%   Cada tipo de jugador:
 %
-%       humano    la consola                           (#12)
-%       facil     recuerda lo que ve                   (#13)
-%       media     deduce con restricciones             (#14, #15)
-%       dificil   además elige la mejor sugerencia     (#21)
+%       azar      juega al azar y no aprende nada: es el nivel más bajo,
+%                 la referencia con la que comparar a todos los demás
+%       humano    POR AHORA juega al azar; tendrá la consola         (#12)
+%       facil     recuerda las cartas que le enseñan; sugiere las que
+%                 no ha visto y acusa cuando solo le queda una de
+%                 cada tipo (ia.pl)
+%       media     POR AHORA juega al azar; deducirá con restricciones (#14, #15)
+%       dificil   POR AHORA juega al azar; además elegirá la mejor
+%                 sugerencia                                          (#21)
 
+elige_accion(azar,    J, _, Accion, J) :- accion_al_azar(Accion).
 elige_accion(humano,  J, _, Accion, J) :- accion_al_azar(Accion).
-elige_accion(facil,   J, _, Accion, J) :- accion_al_azar(Accion).
+elige_accion(facil,   J, _, Accion, J) :-
+    J = jugador(_, facil, vistas(Vistas)),
+    facil_accion(Vistas, Accion).
 elige_accion(media,   J, _, Accion, J) :- accion_al_azar(Accion).
 elige_accion(dificil, J, _, Accion, J) :- accion_al_azar(Accion).
 
+elige_carta(azar,    J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
 elige_carta(humano,  J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
 elige_carta(facil,   J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
 elige_carta(media,   J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
 elige_carta(dificil, J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
 
+observa(azar,    J, _, J).
 observa(humano,  J, _, J).
-observa(facil,   J, Evento, J1) :- facil_observa(Evento, J, J1).
+observa(facil, jugador(Id, facil, vistas(Vistas)), Evento, jugador(Id, facil, vistas(Vistas1))) :-
+    facil_recordar(Evento, Vistas, Vistas1).
 observa(media,   J, _, J).
 observa(dificil, J, _, J).
-
-% La IA fácil solo recuerda las cartas que le enseñan.
-facil_observa(carta_vista(_, Carta), jugador(Id, facil, vistas(Vistas)), jugador(Id, facil, vistas(Vistas1))) :-
-    !,
-    (   memberchk(Carta, Vistas) -> Vistas1 = Vistas ; Vistas1 = [Carta|Vistas] ).
-facil_observa(_, J, J).
 
 % Una de cada diez veces acusa; el resto, sugiere.
 accion_al_azar(Accion) :-

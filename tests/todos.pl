@@ -11,5 +11,6 @@
 
 :- consult(test_juego).
 :- consult(test_deduccion).
+:- consult(test_ia).
 :- consult(test_jugador).
 :- consult(test_turnos).

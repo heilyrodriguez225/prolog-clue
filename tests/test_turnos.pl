@@ -118,7 +118,7 @@ test(una_accion_incompleta_no_vale, [fail]) :-
 
 :- begin_tests(un_turno).
 
-test(da_una_accion_valida_para_cada_tipo, [forall(member(Tipo, [humano, facil, media, dificil]))]) :-
+test(da_una_accion_valida_para_cada_tipo, [forall(member(Tipo, [humano, facil, media, dificil, azar]))]) :-
     partida_en_turno(1, [], P),
     jugadores_iniciales(P, [Tipo, facil, facil, facil], Js),
     forall(between(1, 40, _),
@@ -467,24 +467,26 @@ test(el_ultimo_puede_ser_cualquiera, [forall(member(Ultimo, [1, 2, 3, 4]))]) :-
     Ganador == Ultimo,
     Motivo == ultimo.
 
-test(una_partida_termina_con_un_ganador, [forall(member(N, [3, 4, 5]))]) :-
-    length(Tipos, N), maplist(=(facil), Tipos),
+test(una_partida_termina_con_un_ganador, [forall((member(N, [3, 4, 5]), member(Tipo, [azar, facil])))]) :-
+    length(Tipos, N), maplist(=(Tipo), Tipos),
     forall(between(1, 15, _),
            ( jugar_con(Tipos, fin(Ganador, Motivo, _, Js)),
              integer(Ganador), Ganador >= 1, Ganador =< N,
              memberchk(Motivo, [acierta, ultimo]),
              length(Js, N) )).
 
-test(si_alguien_acierta_gana_y_es_lo_ultimo_del_historial, [forall(member(N, [3, 4, 5]))]) :-
+test(con_ias_faciles_gana_quien_acierta_y_es_lo_ultimo_del_historial, [forall(member(N, [3, 4, 5]))]) :-
+    % Una IA fácil solo acusa cuando está segura, así que estas partidas
+    % siempre terminan acertando.
     length(Tipos, N), maplist(=(facil), Tipos),
-    forall(between(1, 40, _),
-           ( jugar_con(Tipos, fin(Ganador, acierta, partida(sobre(S, A, L), _, _, Eliminados, H), _))
-           ->  last(H, acusacion(Ganador, [S, A, L], acierta)),
-               \+ memberchk(Ganador, Eliminados)
-           ;   true )).
+    forall(between(1, 20, _),
+           ( jugar_con(Tipos, fin(Ganador, Motivo, partida(sobre(S, A, L), _, _, Eliminados, H), _)),
+             Motivo == acierta,
+             last(H, acusacion(Ganador, [S, A, L], acierta)),
+             Eliminados == [] )).
 
 test(si_gana_el_ultimo_todos_los_demas_cayeron, [forall(member(N, [3, 4, 5]))]) :-
-    length(Tipos, N), maplist(=(facil), Tipos),
+    length(Tipos, N), maplist(=(azar), Tipos),
     forall(between(1, 15, _),
            ( jugar_con(Tipos, fin(Ganador, Motivo, partida(_, _, _, Eliminados, _), _)),
              (   Motivo == ultimo
@@ -493,7 +495,7 @@ test(si_gana_el_ultimo_todos_los_demas_cayeron, [forall(member(N, [3, 4, 5]))]) 
              ;   true ) )).
 
 test(cada_eliminado_tiene_una_acusacion_fallida_en_el_historial, [forall(member(N, [3, 4, 5]))]) :-
-    length(Tipos, N), maplist(=(facil), Tipos),
+    length(Tipos, N), maplist(=(azar), Tipos),
     forall(between(1, 15, _),
            ( jugar_con(Tipos, fin(_, _, partida(_, _, _, Eliminados, H), _)),
              forall(member(E, Eliminados), memberchk(acusacion(E, _, falla), H)) )).
@@ -505,14 +507,14 @@ test(el_historial_solo_tiene_eventos_publicos, [forall(member(N, [3, 4, 5]))]) :
              forall(member(E, H), evento_publico(E)) )).
 
 test(nadie_juega_dos_veces_seguidas) :-
-    length(Tipos, 4), maplist(=(facil), Tipos),
+    length(Tipos, 4), maplist(=(azar), Tipos),
     forall(between(1, 15, _),
            ( jugar_con(Tipos, fin(_, _, partida(_, _, _, _, H), _)),
              findall(Q, ( member(E, H), arg(1, E, Q) ), Quienes),
              sin_repetidos_seguidos(Quienes) )).
 
 test(un_eliminado_no_vuelve_a_jugar, [forall(member(N, [3, 4, 5]))]) :-
-    length(Tipos, N), maplist(=(facil), Tipos),
+    length(Tipos, N), maplist(=(azar), Tipos),
     forall(between(1, 15, _),
            ( jugar_con(Tipos, fin(_, _, partida(_, _, _, _, H), _)),
              nadie_juega_tras_caer(H, []) )).
@@ -520,7 +522,7 @@ test(un_eliminado_no_vuelve_a_jugar, [forall(member(N, [3, 4, 5]))]) :-
 test(los_turnos_siguen_el_orden_circular, [forall(member(N, [3, 4, 5]))]) :-
     % Cada jugador que juega es el siguiente en círculo (sin eliminados)
     % al anterior, saltando solo a los eliminados.
-    length(Tipos, N), maplist(=(facil), Tipos),
+    length(Tipos, N), maplist(=(azar), Tipos),
     forall(between(1, 15, _),
            ( jugar_con(Tipos, fin(_, _, partida(_, _, _, _, H), _)),
              turnos_en_orden(H, N, [], none) )).
