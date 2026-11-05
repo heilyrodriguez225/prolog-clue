@@ -7,6 +7,11 @@
     IA fácil: su memoria son las cartas que ha visto (las suyas y las que
     le han enseñado). Sabe que ninguna de ellas está en el sobre.
 
+    IA media: su memoria es un conocimiento de deduccion.pl, con
+    restricciones CLP(FD). Convierte en restricciones todo lo que ve en la
+    mesa, también las sugerencias de los demás, y deduce qué cartas pueden
+    estar en el sobre.
+
         juego.pl  <-  deduccion.pl  <-  ia.pl  <-  jugador.pl  <-  turnos.pl
 */
 
@@ -14,13 +19,16 @@
           [ cartas_sin_ver/3,
             facil_recordar/3,
             facil_sugerencia/2,
-            facil_accion/2
+            facil_accion/2,
+            media_observar/3,
+            media_accion/2
           ]).
 
 :- use_module(library(lists)).
 :- use_module(library(random)).
 :- use_module(library(error)).
 :- use_module(juego, [carta/2]).
+:- use_module(deduccion).
 
 %!  cartas_sin_ver(+Tipo, +Vistas, -Cartas) is det.
 %
@@ -86,4 +94,82 @@ facil_accion(Vistas, Accion) :-
     (   Sospechosos = [S], Armas = [A], Lugares = [L]
     ->  Accion = acusar(S, A, L)
     ;   facil_sugerencia(Vistas, Accion)
+    ).
+
+%   ---------------------------------------------------------------------
+%   IA media
+
+%!  media_observar(+Yo, +Evento, +K) is det.
+%
+%   La IA media (el jugador Yo, con conocimiento K) ve un Evento. Lo
+%   convierte en restricciones y las añade a K, que es el mismo término
+%   (las restricciones viven en sus variables).
+%
+%       sugerencia(Quien, Cartas, Respuestas)
+%           no_pudo(J)    J no tiene ninguna de las tres cartas
+%           refuto(J)     J tiene al menos una de las tres (no se sabe cuál)
+%       carta_vista(J, Carta)
+%           J tiene Carta
+%       acusacion(_, Cartas, falla)
+%           las tres cartas no son, juntas, las del sobre
+%
+%   Lo que le ocurre a la propia IA no aporta nada nuevo: no necesita
+%   enterarse de que ella misma no pudo refutar, y si ella refutó, ya
+%   sabe lo que enseñó. Y cuando es ella quien sugiere y alguien refuta,
+%   la carta concreta le llega aparte como carta_vista/2, que dice más
+%   que el simple "tiene alguna".
+%
+%   Las restricciones se añaden con maplist y predicados auxiliares,
+%   nunca con forall ni con lambdas: forall las desharía al terminar y
+%   las lambdas copiarían K, así que se perderían en los dos casos.
+
+media_observar(Yo, Evento, K) :-
+    (   Evento = sugerencia(Quien, Cartas, Respuestas)
+    ->  maplist(media_respuesta(K, Yo, Quien, Cartas), Respuestas)
+    ;   Evento = carta_vista(J, Carta)
+    ->  mostro(K, J, Carta)
+    ;   Evento = acusacion(_, Cartas, falla)
+    ->  acusacion_fallida(K, Cartas)
+    ;   true
+    ).
+
+media_respuesta(K, Yo, Quien, Cartas, Respuesta) :-
+    (   Respuesta = no_pudo(J), J \== Yo
+    ->  no_refuto(K, J, Cartas)
+    ;   Respuesta = refuto(J), J \== Yo, Quien \== Yo
+    ->  refuto(K, J, Cartas)
+    ;   true
+    ).
+
+%!  media_accion(+K, -Accion) is det.
+%
+%   Lo que hace la IA media en su turno.
+%
+%       - Si de cada tipo solo queda UNA carta que pueda estar en el
+%         sobre (es lo que comprueba solucion_segura/2), acusa.
+%       - Si no, sugiere una carta de cada tipo entre las que todavía
+%         pueden estar en el sobre.
+%
+%   A diferencia de la IA fácil, no necesita haber visto las cartas: le
+%   basta con deducir que no pueden estar en el sobre. Y como solo
+%   acusa cuando el motor de restricciones lo demuestra, nunca falla.
+
+media_accion(K, Accion) :-
+    posibles_de_tipo(K, sospechoso, Sospechosos),
+    posibles_de_tipo(K, arma, Armas),
+    posibles_de_tipo(K, lugar, Lugares),
+    (   Sospechosos = [S], Armas = [A], Lugares = [L]
+    ->  Accion = acusar(S, A, L)
+    ;   una_de(sospechoso, Sospechosos, S),
+        una_de(arma, Armas, A),
+        una_de(lugar, Lugares, L),
+        Accion = sugerir(S, A, L)
+    ).
+
+% Una carta al azar de la lista. Una lista vacía es imposible: el sobre
+% tiene siempre una carta de cada tipo.
+una_de(Tipo, Cartas, Carta) :-
+    (   Cartas == []
+    ->  existence_error(carta_posible, Tipo)
+    ;   random_member(Carta, Cartas)
     ).

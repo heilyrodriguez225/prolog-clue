@@ -16,9 +16,11 @@
             mostro/3,
             refuto/3,
             no_refuto/3,
+            acusacion_fallida/2,
             estado_carta/3,
             puede_estar_en_sobre/2,
             posibles_en_sobre/2,
+            posibles_de_tipo/3,
             deducir/2,
             probabilidades/2,
             probabilidades/3,
@@ -103,6 +105,15 @@ no_refuto(conocimiento(_, P), J, Cs) :- maplist(no_es_de(P, J), Cs).
 refuto(conocimiento(_, P), J, [A, B, C]) :-
     dueno(P, A, DA), dueno(P, B, DB), dueno(P, C, DC),
     (DA #= J) #\/ (DB #= J) #\/ (DC #= J).
+
+%!  acusacion_fallida(+K, +Cartas) is semidet.
+%
+%   Alguien acusó a Cartas = [S, A, L] y se equivocó: esas tres cartas NO
+%   son las del sobre. No se sabe cuál de las tres está mal; solo que no
+%   están las tres juntas en el sobre.
+acusacion_fallida(conocimiento(_, P), [A, B, C]) :-
+    dueno(P, A, DA), dueno(P, B, DB), dueno(P, C, DC),
+    (DA #\= 0) #\/ (DB #\= 0) #\/ (DC #\= 0).
 
 %!  estado_carta(+K, ?Carta, -Estado) is nondet.
 %

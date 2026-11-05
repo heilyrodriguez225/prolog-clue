@@ -80,6 +80,24 @@ test(reemplazar_es_determinista) :-
 
 :- end_tests(lista_de_jugadores).
 
+% Tipos de jugador para una partida de N. Las partidas masivas usan los tipos
+% baratos; la IA media, que deduce con restricciones y es la más lenta, se prueba
+% en menos partidas (ver más abajo).
+tipos_variados(N, Tipos) :-
+    tipos_de(N, [humano, facil, dificil, azar], Tipos).
+
+tipos_con_media(N, Tipos) :-
+    tipos_de(N, [media, facil, azar, dificil], Tipos).
+
+tipos_de(N, Todos, Tipos) :-
+    numlist(1, N, Numeros),
+    maplist(tipo_numero(Todos), Numeros, Tipos).
+
+tipo_numero(Todos, Numero, Tipo) :-
+    length(Todos, L),
+    Posicion is (Numero - 1) mod L,
+    nth0(Posicion, Todos, Tipo).
+
 % La partida de los tests: 4 jugadores, con el turno que se indique.
 partida_en_turno(Turno, Eliminados,
                  partida(sobre(senora_coral, cuerda, gimnasio),
@@ -121,7 +139,7 @@ test(una_accion_incompleta_no_vale, [fail]) :-
 test(da_una_accion_valida_para_cada_tipo, [forall(member(Tipo, [humano, facil, media, dificil, azar]))]) :-
     partida_en_turno(1, [], P),
     jugadores_iniciales(P, [Tipo, facil, facil, facil], Js),
-    forall(between(1, 40, _),
+    forall(between(1, 15, _),
            ( accion_del_turno(P, Js, Accion, _),
              accion_valida(Accion) )).
 
@@ -501,8 +519,8 @@ test(cada_eliminado_tiene_una_acusacion_fallida_en_el_historial, [forall(member(
              forall(member(E, Eliminados), memberchk(acusacion(E, _, falla), H)) )).
 
 test(el_historial_solo_tiene_eventos_publicos, [forall(member(N, [3, 4, 5]))]) :-
-    length(Tipos, N), maplist(=(media), Tipos),
-    forall(between(1, 10, _),
+    tipos_con_media(N, Tipos),
+    forall(between(1, 8, _),
            ( jugar_con(Tipos, fin(_, _, partida(_, _, _, _, H), _)),
              forall(member(E, H), evento_publico(E)) )).
 
@@ -620,17 +638,6 @@ test(si_falla_el_penultimo_gana_el_que_queda) :-
 
 :- begin_tests(criterio_de_la_issue_10).
 
-% Tipos de jugador para una partida de N, repartidos entre los cuatro.
-tipos_variados(N, Tipos) :-
-    findall(T, tipo_de_jugador(T), Todos),
-    numlist(1, N, Numeros),
-    maplist(tipo_numero(Todos), Numeros, Tipos).
-
-tipo_numero(Todos, Numero, Tipo) :-
-    length(Todos, L),
-    Posicion is (Numero - 1) mod L,
-    nth0(Posicion, Todos, Tipo).
-
 test(doscientas_partidas_al_azar_terminan_con_un_ganador, [forall(member(N, [3, 4, 5]))]) :-
     % 70 partidas por cada número de jugadores: 210 en total.
     tipos_variados(N, Tipos),
@@ -643,6 +650,17 @@ test(doscientas_partidas_al_azar_terminan_con_un_ganador, [forall(member(N, [3, 
              \+ memberchk(Ganador, Eliminados),
              length(Js1, N),
              length(Manos, N),
+             H = [_|_] )).
+
+test(partidas_con_la_ia_media_terminan_con_un_ganador, [forall(member(N, [3, 4, 5]))]) :-
+    tipos_con_media(N, Tipos),
+    forall(between(1, 8, _),
+           ( iniciar_partida(Tipos, P, Js),
+             jugar(P, Js, fin(Ganador, Motivo, partida(_, _, _, Eliminados, H), Js1)),
+             integer(Ganador), Ganador >= 1, Ganador =< N,
+             memberchk(Motivo, [acierta, ultimo]),
+             \+ memberchk(Ganador, Eliminados),
+             length(Js1, N),
              H = [_|_] )).
 
 test(las_partidas_son_distintas_entre_si) :-
@@ -730,3 +748,65 @@ test(el_bucle_no_llama_a_las_decisiones_internas_de_cada_tipo) :-
            \+ memberchk(Privada, Llamadas)).
 
 :- end_tests(criterio_de_la_issue_10).
+
+:- begin_tests(ia_media_en_partidas).
+
+% Jugador 1 media; los demás, del tipo indicado.
+contra(N, Rival, Tipos) :-
+    Resto is N - 1,
+    length(Rivales, Resto), maplist(=(Rival), Rivales),
+    Tipos = [media|Rivales].
+
+victorias_de_la_media(Tipos, Partidas, Victorias) :-
+    findall(G, ( between(1, Partidas, _),
+                 iniciar_partida(Tipos, P, Js),
+                 jugar(P, Js, fin(G, _, _, _)) ),
+            Ganadores),
+    aggregate_all(count, member(1, Ganadores), Victorias).
+
+test(la_ia_media_nunca_es_eliminada, [forall(member(N, [3, 4, 5]))]) :-
+    % Contra jugadores al azar, que sí se equivocan al acusar: ella nunca.
+    set_random(seed(N)),
+    contra(N, azar, Tipos),
+    forall(between(1, 6, _),
+           ( iniciar_partida(Tipos, P, Js),
+             jugar(P, Js, fin(_, _, partida(_, _, _, Eliminados, _), _)),
+             \+ memberchk(1, Eliminados) )).
+
+test(la_ia_media_gana_a_los_jugadores_al_azar) :-
+    set_random(seed(3)),
+    contra(4, azar, Tipos),
+    victorias_de_la_media(Tipos, 10, V),
+    V >= 9.
+
+test(la_ia_media_gana_a_la_ia_facil) :-
+    set_random(seed(4)),
+    contra(4, facil, Tipos),
+    victorias_de_la_media(Tipos, 10, V),
+    V >= 9.
+
+test(la_ia_media_gana_aunque_no_juegue_la_primera) :-
+    % La ventaja no viene de la posición: en el puesto 3 también gana.
+    set_random(seed(5)),
+    forall(between(1, 5, _),
+           ( iniciar_partida([facil, facil, media, facil], P, Js),
+             jugar(P, Js, fin(G, _, _, _)),
+             G == 3 )).
+
+test(la_ia_media_acaba_en_menos_turnos_que_la_facil) :-
+    % Mide los eventos del historial: cada sugerencia o acusación es uno.
+    set_random(seed(6)),
+    eventos_medios([media, facil, facil, facil], 8, ConMedia),
+    eventos_medios([facil, facil, facil, facil], 8, SoloFaciles),
+    ConMedia < SoloFaciles.
+
+eventos_medios(Tipos, Partidas, Media) :-
+    findall(L, ( between(1, Partidas, _),
+                 iniciar_partida(Tipos, P, Js),
+                 jugar(P, Js, fin(_, _, partida(_, _, _, _, H), _)),
+                 length(H, L) ),
+            Ls),
+    sum_list(Ls, S), length(Ls, N),
+    Media is S / N.
+
+:- end_tests(ia_media_en_partidas).

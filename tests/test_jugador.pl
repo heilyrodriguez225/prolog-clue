@@ -1,6 +1,7 @@
 /*  Tests de src/jugador.pl: los jugadores y su memoria privada.  */
 
 :- use_module(library(plunit)).
+:- use_module(library(clpfd)).
 :- use_module('../src/juego').
 :- use_module('../src/deduccion').
 :- use_module('../src/jugador').
@@ -118,7 +119,7 @@ test(elegir_accion_da_sugerir_o_acusar_con_tres_cartas_validas,
      [forall(member(Tipo, [humano, facil, media, dificil, azar]))]) :-
     partida_de_prueba(P), nuevo_jugador(1, Tipo, P, J),
     vista_vacia(V),
-    forall(between(1, 60, _),
+    forall(between(1, 15, _),
            ( elegir_accion(J, V, Accion, _),
              Accion =.. [Que, S, A, L],
              memberchk(Que, [sugerir, acusar]),
@@ -235,3 +236,47 @@ test(los_eventos_publicos_no_cambian_la_memoria_de_la_ia_facil) :-
     J1 == J.
 
 :- end_tests(eventos).
+
+:- begin_tests(ia_media).
+
+test(observar_actualiza_su_conocimiento_en_su_sitio) :-
+    partida_de_prueba(P), nuevo_jugador(1, media, P, J),
+    J = jugador(1, media, K),
+    once(estado_carta(K, trofeo, dudosa)),
+    observar(J, carta_vista(2, trofeo), J1),
+    J1 == J,                                   % el mismo jugador: las restricciones viven en K
+    once(estado_carta(K, trofeo, descartada)).
+
+test(la_carta_vista_privada_solo_la_aprende_su_destinatario) :-
+    partida_de_prueba(P),
+    jugadores_iniciales(P, [humano, media, media, media], Js),
+    observar_a(3, carta_vista(1, daga), Js, Js1),
+    Js1 = [_, jugador(2, media, K2), jugador(3, media, K3), jugador(4, media, K4)],
+    once(estado_carta(K3, daga, descartada)),
+    once(estado_carta(K2, daga, dudosa)),
+    once(estado_carta(K4, daga, dudosa)).
+
+test(un_evento_publico_lo_aprenden_todas) :-
+    partida_de_prueba(P),
+    jugadores_iniciales(P, [humano, media, media, media], Js),
+    % Ni el 2 ni el 3 ni el 4 pueden tener ninguna de estas cartas... salvo el 3
+    % que acaba de refutar: la IA 2 y la 4 deducen cosas distintas de lo mismo.
+    observar_todos(sugerencia(1, [chef_canela, trofeo, cocina], [no_pudo(3)]), Js, Js1),
+    Js1 = [_, jugador(2, media, K2), _, jugador(4, media, K4)],
+    forall(member(K, [K2, K4]),
+           ( K = conocimiento(_, Modelo),
+             forall(member(C, [chef_canela, trofeo, cocina]),
+                    ( memberchk(C-D, Modelo), \+ \+ D #= 3 -> fail ; true )) )).
+
+test(elegir_accion_acusa_cuando_el_sobre_esta_deducido, [true(Accion == acusar(senora_coral, cuerda, gimnasio))]) :-
+    partida_de_prueba(P), nuevo_jugador(1, media, P, J),
+    observar(J, sugerencia(1, [senora_coral, cuerda, biblioteca], [no_pudo(2), no_pudo(3), no_pudo(4)]), J1),
+    observar(J1, sugerencia(1, [chef_canela, daga, gimnasio], [no_pudo(2), no_pudo(3), no_pudo(4)]), J2),
+    elegir_accion(J2, vista([], [], []), Accion, _).
+
+test(elegir_accion_sugiere_si_no_esta_segura) :-
+    partida_de_prueba(P), nuevo_jugador(1, media, P, J),
+    elegir_accion(J, vista([], [], []), Accion, _),
+    functor(Accion, sugerir, 3).
+
+:- end_tests(ia_media).

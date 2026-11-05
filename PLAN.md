@@ -138,13 +138,16 @@ Se entregan con dos predicados que **hacen cumplir la regla**: `observar_todos/3
 
 **El historial** (`Historial` en la partida) guarda solo los eventos públicos, de la más antigua a la más reciente. La `carta_vista` nunca entra.
 
-**Qué hace la IA con cada evento** (se implementa en las tareas de la fase 2):
+**Qué hace la IA media con cada evento** (`media_observar/3` en `ia.pl`, hecho en #14):
 
 | Evento | Observación en `deduccion.pl` |
 |---|---|
 | `no_pudo(J)` de una sugerencia | `no_refuto(K, J, Cartas)` |
 | `refuto(J)` y no soy quien sugirió | `refuto(K, J, Cartas)`: tiene al menos una, no sé cuál |
 | `carta_vista(J, Carta)` | `mostro(K, J, Carta)` |
+| `acusacion(_, Cartas, falla)` | `acusacion_fallida(K, Cartas)`: esas tres no son, juntas, las del sobre |
+
+Lo que le ocurre a la propia IA no aporta nada: si ella no pudo refutar o refutó, ya lo sabe. Y cuando ella sugiere y alguien refuta, el `refuto(J)` público no se traduce, porque la `carta_vista` que le llega aparte dice más.
 
 **Cómo juega cada tipo** hoy (el protocolo ya funciona; el comportamiento propio llega con cada tarea):
 
@@ -153,7 +156,7 @@ Se entregan con dos predicados que **hacen cumplir la regla**: `observar_todos/3
 | `azar` | Al azar, siempre | (es el nivel más bajo, la referencia con la que comparar a los demás) |
 | `humano` | Al azar | La consola (#12) |
 | `facil` | **Hecho (#13):** recuerda las cartas que le enseñan, sugiere entre las que no ha visto y acusa cuando le queda una sola de cada tipo | |
-| `media` | Al azar | Deduce con restricciones (#14, #15) |
+| `media` | **Hecho (#14):** convierte en restricciones todo lo que ve, deduce qué cartas pueden estar en el sobre, sugiere entre ellas y acusa solo cuando es seguro | Elegirá mejor qué carta enseñar (#15) |
 | `dificil` | Al azar | Además elige la mejor sugerencia (#21) |
 
 ### El bucle de la partida (`turnos.pl`)
@@ -189,7 +192,7 @@ El bucle **solo** habla con los jugadores mediante el protocolo de arriba. No us
 | Nivel | Comportamiento |
 |---|---|
 | Fácil | Sugiere al azar entre las cartas que no ha visto, solo recuerda las que le enseñan y acusa cuando le queda una sola de cada tipo |
-| Medio | Deduce con todas las restricciones y acusa cuando la solución es segura |
+| Medio | Convierte en restricciones lo que ve (sugerencias de todos, quién no pudo refutar, cartas que le enseñan y acusaciones fallidas), sugiere entre las cartas que aún pueden estar en el sobre y acusa solo cuando `solucion_segura/2` lo demuestra |
 | Difícil | Además elige la sugerencia que más reduce la incertidumbre (ganancia de información) |
 
 **Riesgo conocido.** Con 21 cartas no se pueden enumerar todos los mundos posibles. Para saber qué cartas *pueden* estar en el sobre basta con comprobar, carta por carta, si existe al menos un mundo coherente. Las probabilidades se aproximan por muestreo (F1·04, F1·05).

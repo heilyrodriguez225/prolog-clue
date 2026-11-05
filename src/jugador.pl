@@ -160,7 +160,8 @@ observar(Jugador, Evento, Jugador1) :-
 %       facil     recuerda las cartas que le enseñan; sugiere las que
 %                 no ha visto y acusa cuando solo le queda una de
 %                 cada tipo (ia.pl)
-%       media     POR AHORA juega al azar; deducirá con restricciones (#14, #15)
+%       media     convierte en restricciones todo lo que ve y deduce qué
+%                 puede estar en el sobre; acusa solo cuando es seguro (ia.pl)
 %       dificil   POR AHORA juega al azar; además elegirá la mejor
 %                 sugerencia                                          (#21)
 
@@ -169,7 +170,9 @@ elige_accion(humano,  J, _, Accion, J) :- accion_al_azar(Accion).
 elige_accion(facil,   J, _, Accion, J) :-
     J = jugador(_, facil, vistas(Vistas)),
     facil_accion(Vistas, Accion).
-elige_accion(media,   J, _, Accion, J) :- accion_al_azar(Accion).
+elige_accion(media,   J, _, Accion, J) :-
+    J = jugador(_, media, K),
+    media_accion(K, Accion).
 elige_accion(dificil, J, _, Accion, J) :- accion_al_azar(Accion).
 
 elige_carta(azar,    J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
@@ -182,7 +185,9 @@ observa(azar,    J, _, J).
 observa(humano,  J, _, J).
 observa(facil, jugador(Id, facil, vistas(Vistas)), Evento, jugador(Id, facil, vistas(Vistas1))) :-
     facil_recordar(Evento, Vistas, Vistas1).
-observa(media,   J, _, J).
+observa(media, J, Evento, J) :-
+    J = jugador(Id, media, K),
+    media_observar(Id, Evento, K).
 observa(dificil, J, _, J).
 
 % Una de cada diez veces acusa; el resto, sugiere.
