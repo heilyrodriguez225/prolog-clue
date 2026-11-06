@@ -116,7 +116,7 @@ test(la_vista_no_contiene_el_sobre_ni_las_manos_ajenas) :-
 vista_vacia(vista([], [], [])).
 
 test(elegir_accion_da_sugerir_o_acusar_con_tres_cartas_validas,
-     [forall(member(Tipo, [humano, facil, media, dificil, azar]))]) :-
+     [forall(member(Tipo, [facil, media, dificil, azar]))]) :-
     partida_de_prueba(P), nuevo_jugador(1, Tipo, P, J),
     vista_vacia(V),
     forall(between(1, 15, _),
@@ -141,7 +141,7 @@ test(elegir_accion_a_veces_sugiere_y_a_veces_acusa) :-
     NSugerir > 150.
 
 test(elegir_carta_ensenia_una_de_las_candidatas,
-     [forall(member(Tipo, [humano, facil, media, dificil, azar]))]) :-
+     [forall(member(Tipo, [facil, media, dificil, azar]))]) :-
     partida_de_prueba(P), nuevo_jugador(2, Tipo, P, J),
     Candidatas = [trofeo, comedor],
     forall(between(1, 40, _),
@@ -154,7 +154,7 @@ test(con_una_sola_candidata_ensenia_esa, [true(Carta == trofeo)]) :-
     elegir_carta_a_mostrar(J, sugerencia(1, [chef_canela, trofeo, cocina]), [trofeo], Carta, _).
 
 test(las_operaciones_devuelven_al_mismo_jugador_con_su_id_y_tipo,
-     [forall(member(Tipo, [humano, facil, media, dificil, azar]))]) :-
+     [forall(member(Tipo, [facil, media, dificil, azar]))]) :-
     partida_de_prueba(P), nuevo_jugador(2, Tipo, P, J),
     vista_vacia(V),
     elegir_accion(J, V, _, J1),
@@ -186,7 +186,7 @@ test(ningun_evento_es_publico_y_privado) :-
 
 test(observar_todos_entrega_a_todos_y_conserva_el_orden) :-
     partida_de_prueba(P),
-    jugadores_iniciales(P, [humano, facil, media, dificil], Js),
+    jugadores_iniciales(P, [azar, facil, media, dificil], Js),
     observar_todos(sugerencia(1, [chef_canela, trofeo, cocina], [refuto(2)]), Js, Js1),
     length(Js1, 4),
     Js1 = [jugador(1, _, _), jugador(2, _, _), jugador(3, _, _), jugador(4, _, _)].
@@ -194,18 +194,18 @@ test(observar_todos_entrega_a_todos_y_conserva_el_orden) :-
 test(no_se_puede_difundir_un_evento_privado,
      [error(domain_error(evento_publico, carta_vista(3, trofeo)))]) :-
     partida_de_prueba(P),
-    jugadores_iniciales(P, [humano, facil, media, dificil], Js),
+    jugadores_iniciales(P, [azar, facil, media, dificil], Js),
     observar_todos(carta_vista(3, trofeo), Js, _).
 
 test(no_se_puede_entregar_en_privado_un_evento_publico,
      [error(domain_error(evento_privado, acusacion(2, [a, b, c], falla)))]) :-
     partida_de_prueba(P),
-    jugadores_iniciales(P, [humano, facil, media, dificil], Js),
+    jugadores_iniciales(P, [azar, facil, media, dificil], Js),
     observar_a(1, acusacion(2, [a, b, c], falla), Js, _).
 
 test(el_evento_privado_solo_llega_a_su_destinatario) :-
     partida_de_prueba(P),
-    jugadores_iniciales(P, [humano, facil, facil, facil], Js),
+    jugadores_iniciales(P, [azar, facil, facil, facil], Js),
     % La daga es del jugador 1: ninguno de los otros la conoce al empezar.
     observar_a(3, carta_vista(1, daga), Js, Js1),
     Js1 = [_, jugador(2, facil, vistas(V2)), jugador(3, facil, vistas(V3)), jugador(4, facil, vistas(V4))],
@@ -249,7 +249,7 @@ test(observar_actualiza_su_conocimiento_en_su_sitio) :-
 
 test(la_carta_vista_privada_solo_la_aprende_su_destinatario) :-
     partida_de_prueba(P),
-    jugadores_iniciales(P, [humano, media, media, media], Js),
+    jugadores_iniciales(P, [azar, media, media, media], Js),
     observar_a(3, carta_vista(1, daga), Js, Js1),
     Js1 = [_, jugador(2, media, K2), jugador(3, media, K3), jugador(4, media, K4)],
     once(estado_carta(K3, daga, descartada)),
@@ -258,7 +258,7 @@ test(la_carta_vista_privada_solo_la_aprende_su_destinatario) :-
 
 test(un_evento_publico_lo_aprenden_todas) :-
     partida_de_prueba(P),
-    jugadores_iniciales(P, [humano, media, media, media], Js),
+    jugadores_iniciales(P, [azar, media, media, media], Js),
     % Ni el 2 ni el 3 ni el 4 pueden tener ninguna de estas cartas... salvo el 3
     % que acaba de refutar: la IA 2 y la 4 deducen cosas distintas de lo mismo.
     observar_todos(sugerencia(1, [chef_canela, trofeo, cocina], [no_pudo(3)]), Js, Js1),
@@ -280,3 +280,73 @@ test(elegir_accion_sugiere_si_no_esta_segura) :-
     functor(Accion, sugerir, 3).
 
 :- end_tests(ia_media).
+
+:- begin_tests(humano).
+
+% El jugador humano habla por la terminal: aquí la entrada es un texto y la
+% salida se recoge, sin teclado.
+con_terminal(Texto, Goal, Salida) :-
+    open_string(Texto, Entrada),
+    current_input(Anterior),
+    setup_call_cleanup(
+        set_input(Entrada),
+        with_output_to(string(Salida), Goal),
+        ( set_input(Anterior), close(Entrada) )).
+
+test(elegir_accion_pregunta_por_la_terminal, [true(Accion == sugerir(chef_canela, trofeo, biblioteca))]) :-
+    partida_de_prueba(P), nuevo_jugador(1, humano, P, J),
+    vista_de(1, P, Vista),
+    con_terminal("1\n1\n1\n1\n", elegir_accion(J, Vista, Accion, _), Salida),
+    once(sub_string(Salida, _, _, _, "== Tu turno ==")),
+    once(sub_string(Salida, _, _, _, "Tus cartas: Chef Canela, Daga, Biblioteca, Cocina y Piscina")).
+
+test(puede_acusar, [true(Accion == acusar(senora_coral, cuerda, gimnasio))]) :-
+    partida_de_prueba(P), nuevo_jugador(1, humano, P, J),
+    vista_de(1, P, Vista),
+    con_terminal("2\n3\n3\n8\n1\n", elegir_accion(J, Vista, Accion, _), _).
+
+test(elegir_carta_pregunta_si_hay_varias, [true(Carta == cocina)]) :-
+    partida_de_prueba(P), nuevo_jugador(1, humano, P, J),
+    con_terminal("2\n",
+                 elegir_carta_a_mostrar(J, sugerencia(2, [chef_canela, trofeo, cocina]),
+                                        [chef_canela, cocina], Carta, _), _).
+
+test(elegir_carta_no_pregunta_si_solo_tiene_una, [true(Carta == trofeo)]) :-
+    partida_de_prueba(P), nuevo_jugador(2, humano, P, J),
+    con_terminal("", elegir_carta_a_mostrar(J, sugerencia(1, [chef_canela, trofeo, cocina]),
+                                            [trofeo], Carta, _), _).
+
+test(observar_cuenta_lo_que_ocurre_y_no_cambia_al_jugador) :-
+    partida_de_prueba(P), nuevo_jugador(1, humano, P, J),
+    con_terminal("", observar(J, sugerencia(2, [chef_canela, trofeo, cocina], [no_pudo(3), refuto(4)]), J1), Salida),
+    J1 == J,
+    once(sub_string(Salida, _, _, _, "El jugador 2 sugiere")),
+    once(sub_string(Salida, _, _, _, "El jugador 4 refutó")).
+
+test(observar_la_carta_privada_la_muestra) :-
+    partida_de_prueba(P), nuevo_jugador(1, humano, P, J),
+    con_terminal("", observar(J, carta_vista(3, veneno), _), Salida),
+    once(sub_string(Salida, _, _, _, "El jugador 3 te enseña: Veneno")).
+
+test(un_evento_publico_le_llega_al_humano_y_a_las_ias) :-
+    partida_de_prueba(P),
+    jugadores_iniciales(P, [humano, facil, media, azar], Js),
+    con_terminal("",
+                 observar_todos(sugerencia(2, [chef_canela, trofeo, cocina], [refuto(3)]), Js, Js1),
+                 Salida),
+    length(Js1, 4),
+    once(sub_string(Salida, _, _, _, "El jugador 3 refutó")).
+
+test(la_carta_privada_no_sale_por_pantalla_si_no_es_para_el_humano) :-
+    % Se le entrega a otro jugador: el humano no escribe nada.
+    partida_de_prueba(P),
+    jugadores_iniciales(P, [humano, facil, media, azar], Js),
+    con_terminal("", observar_a(2, carta_vista(3, veneno), Js, _), Salida),
+    Salida == "".
+
+test(el_humano_sigue_sin_memoria_aunque_hable, [true(M == [])]) :-
+    partida_de_prueba(P), nuevo_jugador(1, humano, P, J),
+    con_terminal("1\n1\n1\n1\n", elegir_accion(J, vista([], [], []), _, J1), _),
+    J1 = jugador(1, humano, M).
+
+:- end_tests(humano).

@@ -68,7 +68,9 @@ src/
   turnos.pl       el bucle de la partida: turnos, sugerencias, acusaciones y fin
   ia.pl           lo que decide cada nivel de IA, sobre listas de cartas
   explicacion.pl  metaintérprete: por qué la IA sabe lo que sabe
-  consola.pl      interfaz de texto
+  consola.pl      entrada y salida por la terminal del jugador humano
+  sherlog.pl      una partida completa contra las IAs, por la terminal
+  jugar.pl        el programa: swipl src/jugar.pl
   servidor.pl     API HTTP/JSON (library(http))
 web/              página del juego (HTML, CSS, JS)
 tests/            tests con plunit
@@ -79,10 +81,13 @@ La interfaz web no tiene lógica de juego: solo muestra el estado y envía las a
 **Dependencias entre módulos.** Cada uno importa solo a los de su izquierda, para que no haya ciclos:
 
 ```
-juego.pl  ←  deduccion.pl  ←  ia.pl  ←  jugador.pl  ←  turnos.pl
+juego.pl  ←  deduccion.pl  ←  ia.pl  ←  jugador.pl  ←  turnos.pl  ←  sherlog.pl  ←  jugar.pl
+              juego.pl  ←  consola.pl  ↗  (jugador.pl también importa consola.pl)
 ```
 
 Por eso el bucle de la partida no vive en `juego.pl`: `jugador.pl` ya importa `juego.pl` (para las cartas) y el bucle necesita importar `jugador.pl`.
+
+La consola tiene el mismo cuidado. `consola.pl` solo conoce las cartas (`juego.pl`) y no sabe nada de jugadores ni del bucle, así que `jugador.pl` puede usarla para el tipo `humano` sin crear un ciclo. La lógica de la partida por terminal vive en `sherlog.pl`; `jugar.pl` es solo el programa que la arranca. Se separan porque cargar un archivo con `initialization(main, main)` lo ejecuta, y los tests necesitan cargar la lógica sin que empiece una partida.
 
 ### El protocolo de jugador
 
@@ -154,7 +159,7 @@ Lo que le ocurre a la propia IA no aporta nada: si ella no pudo refutar o refut�
 | Tipo | Hoy | Después |
 |---|---|---|
 | `azar` | Al azar, siempre | (es el nivel más bajo, la referencia con la que comparar a los demás) |
-| `humano` | Al azar | La consola (#12) |
+| `humano` | **Hecho (#12):** pregunta por la terminal y cuenta lo que ocurre | |
 | `facil` | **Hecho (#13):** recuerda las cartas que le enseñan, sugiere entre las que no ha visto y acusa cuando le queda una sola de cada tipo | |
 | `media` | **Hecho (#14):** convierte en restricciones todo lo que ve, deduce qué cartas pueden estar en el sobre, sugiere entre ellas y acusa solo cuando es seguro | Elegirá mejor qué carta enseñar (#15) |
 | `dificil` | Al azar | Además elige la mejor sugerencia (#21) |
@@ -208,6 +213,8 @@ El bucle **solo** habla con los jugadores mediante el protocolo de arriba. No us
 | **F4 — Explicación, torneo y entrega** | 16 – 22 nov | La IA explica sus deducciones, hay estadísticas del torneo entre IAs, informe y demo listos |
 
 **Regla principal:** al final de F2 tiene que existir un juego completo en consola. Todo lo posterior es mejora.
+
+Estado de la F2: la partida completa en consola **ya existe** (`swipl src/jugar.pl`).
 
 ## §6 Conceptos del curso
 

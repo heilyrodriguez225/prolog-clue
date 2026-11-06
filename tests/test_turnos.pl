@@ -84,7 +84,7 @@ test(reemplazar_es_determinista) :-
 % baratos; la IA media, que deduce con restricciones y es la más lenta, se prueba
 % en menos partidas (ver más abajo).
 tipos_variados(N, Tipos) :-
-    tipos_de(N, [humano, facil, dificil, azar], Tipos).
+    tipos_de(N, [azar, facil, dificil, azar], Tipos).
 
 tipos_con_media(N, Tipos) :-
     tipos_de(N, [media, facil, azar, dificil], Tipos).
@@ -136,7 +136,7 @@ test(una_accion_incompleta_no_vale, [fail]) :-
 
 :- begin_tests(un_turno).
 
-test(da_una_accion_valida_para_cada_tipo, [forall(member(Tipo, [humano, facil, media, dificil, azar]))]) :-
+test(da_una_accion_valida_para_cada_tipo, [forall(member(Tipo, [facil, media, dificil, azar]))]) :-
     partida_en_turno(1, [], P),
     jugadores_iniciales(P, [Tipo, facil, facil, facil], Js),
     forall(between(1, 15, _),

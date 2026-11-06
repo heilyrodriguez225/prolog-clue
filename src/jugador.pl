@@ -39,6 +39,7 @@
 :- use_module(library(random)).
 :- use_module(deduccion).
 :- use_module(ia).
+:- use_module(consola).
 :- use_module(juego, [carta/2]).
 
 %!  tipo_de_jugador(?Tipo) is nondet.
@@ -156,7 +157,7 @@ observar(Jugador, Evento, Jugador1) :-
 %
 %       azar      juega al azar y no aprende nada: es el nivel más bajo,
 %                 la referencia con la que comparar a todos los demás
-%       humano    POR AHORA juega al azar; tendrá la consola         (#12)
+%       humano    pregunta por la terminal y cuenta lo que ocurre (consola.pl)
 %       facil     recuerda las cartas que le enseñan; sugiere las que
 %                 no ha visto y acusa cuando solo le queda una de
 %                 cada tipo (ia.pl)
@@ -166,7 +167,9 @@ observar(Jugador, Evento, Jugador1) :-
 %                 sugerencia                                          (#21)
 
 elige_accion(azar,    J, _, Accion, J) :- accion_al_azar(Accion).
-elige_accion(humano,  J, _, Accion, J) :- accion_al_azar(Accion).
+elige_accion(humano,  J, Vista, Accion, J) :-
+    J = jugador(Id, humano, _),
+    preguntar_accion(Id, Vista, Accion).
 elige_accion(facil,   J, _, Accion, J) :-
     J = jugador(_, facil, vistas(Vistas)),
     facil_accion(Vistas, Accion).
@@ -176,13 +179,16 @@ elige_accion(media,   J, _, Accion, J) :-
 elige_accion(dificil, J, _, Accion, J) :- accion_al_azar(Accion).
 
 elige_carta(azar,    J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
-elige_carta(humano,  J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
+elige_carta(humano,  J, Sugerencia, Candidatas, Carta, J) :-
+    preguntar_carta(Sugerencia, Candidatas, Carta).
 elige_carta(facil,   J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
 elige_carta(media,   J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
 elige_carta(dificil, J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
 
 observa(azar,    J, _, J).
-observa(humano,  J, _, J).
+observa(humano, J, Evento, J) :-
+    J = jugador(Id, humano, _),
+    mostrar_evento(Id, Evento).
 observa(facil, jugador(Id, facil, vistas(Vistas)), Evento, jugador(Id, facil, vistas(Vistas1))) :-
     facil_recordar(Evento, Vistas, Vistas1).
 observa(media, J, Evento, J) :-
