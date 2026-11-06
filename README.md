@@ -88,6 +88,16 @@ Para ejecutar solo un archivo:
 swipl -q -g run_tests -t halt tests/test_deduccion.pl
 ```
 
+### Partidas largas
+
+```bash
+swipl tests/partidas_largas.pl
+```
+
+Juega **100 partidas completas solo entre IAs**, con 3, 4 y 5 jugadores y distintas mezclas de niveles, y comprueba que ninguna da error ni algo incoherente: que hay un ganador que no está eliminado, que quien gana acertando coincide con el sobre real, que la IA media y la fácil no se eliminan nunca, que el historial solo tiene eventos públicos, que los turnos van en orden y que la IA media nunca descarta el sobre real. Al final muestra cuántas partidas gana cada nivel (la media gana a la fácil y a la de azar). Tarda unos 20 segundos y termina con código 0 si todo está bien. Acepta una semilla: `swipl tests/partidas_largas.pl 7`.
+
+No forma parte de `todos.pl` porque tarda más.
+
 ## Plan
 
 - [x] Motor de deducción con restricciones
