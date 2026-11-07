@@ -17,9 +17,9 @@ partida_de_prueba(partida(sobre(senora_coral, cuerda, gimnasio),
 
 :- begin_tests(tipos).
 
-test(hay_cinco_tipos) :-
+test(hay_seis_tipos) :-
     findall(T, tipo_de_jugador(T), Tipos),
-    Tipos == [humano, facil, media, dificil, azar].
+    Tipos == [humano, facil, media, dificil, azar, web].
 
 :- end_tests(tipos).
 
@@ -43,7 +43,7 @@ test(la_ia_media_empieza_con_su_conocimiento, [forall(member(Tipo, [media, dific
     msort(Descartadas, D),
     msort([doctora_violeta, veneno, estudio, bodega], D).
 
-test(un_tipo_desconocido_da_error, [error(type_error(oneof([humano, facil, media, dificil, azar]), robot))]) :-
+test(un_tipo_desconocido_da_error, [error(type_error(oneof([humano, facil, media, dificil, azar, web]), robot))]) :-
     partida_de_prueba(P),
     nuevo_jugador(1, robot, P, _).
 

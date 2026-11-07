@@ -71,7 +71,9 @@ src/
   consola.pl      entrada y salida por la terminal del jugador humano
   sherlog.pl      una partida completa contra las IAs, por la terminal
   jugar.pl        el programa: swipl src/jugar.pl
-  servidor.pl     API HTTP/JSON (library(http))
+  puente.pl       el jugador web: cola de jugadas y foto del estado (entre hilos)
+  servidor.pl     API HTTP/JSON (library(http)) y la página de web/
+  servir.pl       el programa: swipl src/servir.pl [puerto]
 web/              página del juego (HTML, CSS, JS)
 tests/            tests con plunit
 ```
@@ -81,7 +83,8 @@ La interfaz web no tiene lógica de juego: solo muestra el estado y envía las a
 **Dependencias entre módulos.** Cada uno importa solo a los de su izquierda, para que no haya ciclos:
 
 ```
-juego.pl  ←  deduccion.pl  ←  ia.pl  ←  jugador.pl  ←  turnos.pl  ←  sherlog.pl  ←  jugar.pl
+juego.pl  ←  deduccion.pl  ←  ia.pl  ←  puente.pl  ←  jugador.pl  ←  turnos.pl  ←  sherlog.pl  ←  jugar.pl
+                                                                    turnos.pl  ←  servidor.pl  ←  servir.pl
               juego.pl  ←  consola.pl  ↗  (jugador.pl también importa consola.pl)
 ```
 

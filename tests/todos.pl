@@ -16,3 +16,4 @@
 :- consult(test_jugador).
 :- consult(test_turnos).
 :- consult(test_sherlog).
+:- consult(test_servidor).

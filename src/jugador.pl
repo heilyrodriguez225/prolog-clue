@@ -10,6 +10,8 @@
       depende del tipo:
 
           azar, humano    []
+          web             web(Id, Asistente)   la partida y su asistente,
+                                               o none si no tiene
           facil           vistas(Cartas)   las cartas que ha visto
           media, dificil  mente(K, Mostradas)
                             K          el conocimiento de deduccion.pl,
@@ -42,6 +44,7 @@
 :- use_module(deduccion).
 :- use_module(ia).
 :- use_module(consola).
+:- use_module(puente).
 :- use_module(juego, [carta/2]).
 
 %!  tipo_de_jugador(?Tipo) is nondet.
@@ -53,6 +56,7 @@ tipo_de_jugador(facil).
 tipo_de_jugador(media).
 tipo_de_jugador(dificil).
 tipo_de_jugador(azar).
+tipo_de_jugador(web).
 
 %!  nuevo_jugador(+Id, +Tipo, +Partida, -Jugador) is det.
 %
@@ -60,11 +64,13 @@ tipo_de_jugador(azar).
 %   empieza: solo lo que puede saber al principio (su propia mano).
 
 nuevo_jugador(Id, Tipo, Partida, jugador(Id, Tipo, Memoria)) :-
-    must_be(oneof([humano, facil, media, dificil, azar]), Tipo),
+    must_be(oneof([humano, facil, media, dificil, azar, web]), Tipo),
     memoria_inicial(Tipo, Id, Partida, Memoria).
 
 memoria_inicial(humano, _, _, []).
 memoria_inicial(azar, _, _, []).
+% El jugador web recibe su memoria de verdad al crear la partida (servidor.pl).
+memoria_inicial(web, _, _, web(sin_partida, none)).
 memoria_inicial(facil, Id, Partida, vistas(Mano)) :-
     mano_de(Id, Partida, Mano).
 memoria_inicial(media, Id, Partida, mente(K, [])) :-
@@ -160,6 +166,8 @@ observar(Jugador, Evento, Jugador1) :-
 %       azar      juega al azar y no aprende nada: es el nivel más bajo,
 %                 la referencia con la que comparar a todos los demás
 %       humano    pregunta por la terminal y cuenta lo que ocurre (consola.pl)
+%       web       lo mismo, pero por una cola y una foto compartida con el
+%                 servidor HTTP, no por la terminal (puente.pl)
 %       facil     recuerda las cartas que le enseñan; sugiere las que
 %                 no ha visto y acusa cuando solo le queda una de
 %                 cada tipo (ia.pl)
@@ -170,6 +178,9 @@ observar(Jugador, Evento, Jugador1) :-
 %                 sugerencia                                          (#21)
 
 elige_accion(azar,    J, _, Accion, J) :- accion_al_azar(Accion).
+elige_accion(web,     J, Vista, Accion, J) :-
+    J = jugador(Yo, web, web(Id, Asistente)),
+    web_preguntar_accion(Id, Yo, Asistente, Vista, Accion).
 elige_accion(humano,  J, Vista, Accion, J) :-
     J = jugador(Id, humano, _),
     preguntar_accion(Id, Vista, Accion).
@@ -182,6 +193,9 @@ elige_accion(media,   J, _, Accion, J) :-
 elige_accion(dificil, J, _, Accion, J) :- accion_al_azar(Accion).
 
 elige_carta(azar,    J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
+elige_carta(web,     J, Sugerencia, Candidatas, Carta, J) :-
+    J = jugador(_, web, web(Id, _)),
+    web_preguntar_carta(Id, Sugerencia, Candidatas, Carta).
 elige_carta(humano,  J, Sugerencia, Candidatas, Carta, J) :-
     preguntar_carta(Sugerencia, Candidatas, Carta).
 elige_carta(facil,   J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
@@ -191,6 +205,9 @@ elige_carta(media, jugador(Id, media, mente(K, Mostradas)), sugerencia(Quien, _)
 elige_carta(dificil, J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
 
 observa(azar,    J, _, J).
+observa(web, J, Evento, J) :-
+    J = jugador(Yo, web, web(Id, Asistente)),
+    web_observar(Id, Yo, Asistente, Evento).
 observa(humano, J, Evento, J) :-
     J = jugador(Id, humano, _),
     mostrar_evento(Id, Evento).
