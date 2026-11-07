@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sherlog</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="barra">
+  <a class="marca" href="inicio.html">
+    <span class="icono">🔍</span>
+    <span>
+      <span class="nombre">SHERLOG</span><br>
+      <span class="lema">Deducción entre detectives</span>
+    </span>
+  </a>
+  <span class="turno">Turno: <strong id="turno-nombre">Tú</strong></span>
+</header>
+
+<main class="juego">
+  <section class="mesa-col">
+    <div class="mesa-encabezado">
+      <div>
+        <span class="etiqueta">Mesa de investigación</span>
+        <h1>¿Quién oculta la verdad?</h1>
+      </div>
+      <span class="pildora-turno"><i class="punto"></i> Turno de <strong id="pildora-turno-nombre">Tú</strong></span>
+    </div>
+
+    <div class="mesa-ovalo" id="mesa-ovalo">
+      <div class="sobre">
+        <span class="etq">Confidencial</span>
+        <div class="ico"></div>
+        <span class="titulo">El sobre del misterio</span>
+        <span class="sub">3 cartas permanecen ocultas</span>
+      </div>
+    </div>
+
+    <details class="actividad">
+      <summary>
+        👁 <span id="actividad-ultimo">Cargando…</span>
+        <span class="mas">⋯ ver historial</span>
+      </summary>
+      <ol id="historial"></ol>
+    </details>
+
+    <div class="mano-seccion">
+      <div class="mano-encabezado">
+        <div>
+          <span class="etiqueta">Evidencia privada</span>
+          <h2>Tu mano <span class="chip" id="mano-cuenta">0 cartas</span></h2>
+        </div>
+        <p class="nota-privada">🔒 Solo tú puedes verlas</p>
+      </div>
+      <div class="abanico" id="mano"></div>
+    </div>
+  </section>
+
+  <aside class="libreta-panel expediente">
+    <div class="libreta-encabezado">
+      <span class="icono">📓</span>
+      <div><span class="pre">Libreta del</span><h2>Detective</h2></div>
+    </div>
+    <p class="lema">Marca lo que sabes. Deduce lo imposible.</p>
+
+    <div class="tabs" id="tabs">
+      <button type="button" class="tab sel" data-tipo="sospechoso">Personas</button>
+      <button type="button" class="tab" data-tipo="arma">Armas</button>
+      <button type="button" class="tab" data-tipo="lugar">Lugares</button>
+    </div>
+
+    <div class="libreta-cab">
+      <span id="libreta-cab-titulo">Sospechosos</span>
+      <span id="libreta-cab-total">6 posibles</span>
+    </div>
+    <div class="libreta-lista" id="libreta-lista"></div>
+
+    <div class="leyenda">
+      <span>☒ Descartado</span><span>？ Sospechoso</span><span>☐ Sin pista</span>
+    </div>
+
+    <div class="progreso">
+      <div class="progreso-cab">⚙ <span>Progreso de deducción</span></div>
+      <div class="progreso-txt" id="progreso-txt">0 de 18 descartadas</div>
+      <div class="progreso-barra"><div class="progreso-rel" id="progreso-rel"></div></div>
+    </div>
+
+    <button type="button" class="boton-teoria" id="boton-sugerir">
+      <span class="ico">🔍</span>
+      <span class="txt"><span class="etq">Probar una teoría</span><span class="val">Hacer sugerencia</span></span>
+      <span class="flecha">›</span>
+    </button>
+    <div class="panel-sugerencia" id="panel-sugerencia" hidden>
+      <div class="selectores" id="selectores"></div>
+      <div class="botones">
+        <button class="primario">Sugerir</button>
+      </div>
+    </div>
+
+    <button type="button" class="boton-acusar">✉ Formular acusación</button>
+  </aside>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

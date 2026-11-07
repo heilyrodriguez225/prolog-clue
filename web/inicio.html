@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sherlog</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="inicio">
+<header class="barra">
+  <a class="marca" href="inicio.html">
+    <span class="icono">🔍</span>
+    <span>
+      <span class="nombre">SHERLOG</span><br>
+      <span class="lema">Deducción entre detectives</span>
+    </span>
+  </a>
+  <button class="boton-fantasma">¿Cómo jugar?</button>
+</header>
+
+<main class="escena">
+ <div class="escena-contenido">
+  <section class="hero">
+    <div class="hero-rotulo">
+      <span class="raya"></span>
+      <span>Nueva partida · La mansión Sherlog</span>
+    </div>
+    <h1>Alguien miente. Tú debes descubrir quién.</h1>
+    <p>
+      Un sospechoso, un arma y un lugar ocultos en el sobre. Pregunta a tus
+      rivales, anota lo que delatan en tu libreta y acusa antes de que
+      alguna de las mentes artificiales de la mesa llegue primero.
+    </p>
+    <div class="hero-stats">
+      <div class="dato"><span class="num">6</span><span class="lbl">Sospechosos</span></div>
+      <span class="punto">·</span>
+      <div class="dato"><span class="num">6</span><span class="lbl">Armas</span></div>
+      <span class="punto">·</span>
+      <div class="dato"><span class="num">9</span><span class="lbl">Lugares</span></div>
+    </div>
+  </section>
+
+  <section class="ficha expediente">
+    <div class="ante">Preferencias de partida</div>
+    <h2>Prepara tu investigación</h2>
+    <p class="sub">Completa tu ficha antes de entrar a la mansión.</p>
+    <hr>
+
+    <div class="campo">
+      <div class="num-etiqueta"><span class="num">01</span><span class="txt">Nombre del detective</span></div>
+      <label class="campo-input">
+        <input id="nombre" type="text" maxlength="20" placeholder="Escribe tu nombre">
+        <span class="contador" id="contador">0/20</span>
+      </label>
+    </div>
+
+    <div class="campo">
+      <div class="num-etiqueta"><span class="num">02</span><span class="txt">Rivales de IA</span></div>
+      <div class="opciones-3" id="rivales">
+        <button type="button" class="op-rival" data-valor="2">
+          <span class="num">2</span><span class="lbl">Rivales</span><span class="tot">3 en total</span>
+        </button>
+        <button type="button" class="op-rival sel" data-valor="3">
+          <span class="num">3</span><span class="lbl">Rivales</span><span class="tot">4 en total</span>
+        </button>
+        <button type="button" class="op-rival" data-valor="4">
+          <span class="num">4</span><span class="lbl">Rivales</span><span class="tot">5 en total</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="campo">
+      <div class="num-etiqueta"><span class="num">03</span><span class="txt">Dificultad</span></div>
+      <div id="dificultad">
+        <button type="button" class="op-dificultad" data-valor="facil">
+          <span class="puntos">●○○</span>
+          <span class="txt"><span class="titulo">Fácil</span><span class="desc">Sugiere al azar y recuerda poco</span></span>
+          <span class="radio"></span>
+        </button>
+        <button type="button" class="op-dificultad sel" data-valor="medio">
+          <span class="puntos">●●○</span>
+          <span class="txt"><span class="titulo">Medio</span><span class="desc">Deduce con todas las restricciones</span></span>
+          <span class="radio"></span>
+        </button>
+        <button type="button" class="op-dificultad" data-valor="dificil">
+          <span class="puntos">●●●</span>
+          <span class="txt"><span class="titulo">Difícil</span><span class="desc">Maximiza la ganancia de información</span></span>
+          <span class="radio"></span>
+        </button>
+      </div>
+      <div class="ayuda">👁 Un desafío equilibrado</div>
+    </div>
+
+    <a class="cta" href="index.html">
+      <span>
+        <span class="etq">La partida está lista</span>
+        <span class="txt">Entrar a la mansión</span>
+      </span>
+      <span class="flecha">›</span>
+    </a>
+    <p class="nota-privada">🔒 Partida privada contra inteligencia artificial</p>
+  </section>
+ </div>
+
+  <footer class="pie-pagina">
+    <span>Expediente Sherlog</span>
+    <span class="cita">«Cuando has eliminado lo imposible, lo que queda debe ser la verdad.»</span>
+    <span>Proyecto final · Prog. declarativa</span>
+  </footer>
+</main>
+
+<script>
+  const nombre = document.getElementById('nombre');
+  const contador = document.getElementById('contador');
+  nombre.addEventListener('input', () => {
+    contador.textContent = `${nombre.value.length}/20`;
+  });
+
+  function exclusivo(contenedorId, clase) {
+    const botones = document.querySelectorAll(`#${contenedorId} ${clase}`);
+    botones.forEach(b => b.addEventListener('click', () => {
+      botones.forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+    }));
+  }
+  exclusivo('rivales', '.op-rival');
+  exclusivo('dificultad', '.op-dificultad');
+</script>
+</body>
+</html>
