@@ -180,6 +180,82 @@ El resultado es `fin(Ganador, Motivo, Partida, Jugadores)`, con el estado final 
 
 El bucle **solo** habla con los jugadores mediante el protocolo de arriba. No usa `deduccion.pl`, no consulta la memoria de nadie y no guarda estado global; los tests lo comprueban leyendo el código del módulo.
 
+### La API web (diseño)
+
+La página y el juego hablan por HTTP con mensajes JSON. Esto es el **diseño**; se implementa en `servidor.pl` (#18) y en la página (#19). La página es libre de verse como quiera: lo único que necesita de Prolog es lo que describe esta sección.
+
+**Cómo espera el servidor al humano, sin tocar el bucle.** HTTP no espera: cada petición recibe una respuesta. Pero el bucle de la partida (`jugar/4`) es una recursión que se queda parada hasta que el humano decide. Se resuelve con **un hilo por partida**:
+
+- Cada partida corre en su propio hilo, con `jugar/4` y la opción `termina_si_cae(1)`.
+- El humano es un tipo de jugador más, **`web`**, que hace lo mismo que `humano`: `elegir_accion/4`, `elegir_carta_a_mostrar/5` y `observar/3`. En vez de preguntar por la terminal, **espera un mensaje en una cola**; las peticiones HTTP lo dejan allí.
+- Mientras espera (y con cada evento que ve), el jugador `web` deja una **foto** del estado en un sitio compartido. Las peticiones `GET` leen esa foto, sin molestar al hilo de la partida.
+- Todo lo que cruza entre hilos son **datos planos** (listas, cadenas, números), nunca términos con restricciones. El conocimiento CLP(FD) vive y se consulta **dentro del hilo de la partida**.
+- Como la consola, no cambia `turnos.pl` ni el protocolo de jugador.
+
+**Rutas.** Todas devuelven JSON. El humano es siempre el jugador 1.
+
+| Ruta | Para qué |
+|---|---|
+| `GET /api/config` | Lo que la página necesita saber antes de empezar, para no repetirlo en JavaScript: las 21 cartas (`id`, `nombre`, `tipo`), los niveles que existen y los límites de rivales (2 a 4). La imagen de cada carta es `img/cartas/{id}.png` |
+| `POST /api/partida` | Crear una partida. Cuerpo: `{"nombre": "Ana", "rivales": [{"nivel": "facil"}, {"nivel": "media"}], "asistente": true}`. De 2 a 4 rivales, **cada uno con su nivel**. Devuelve el estado con el `id` de la partida |
+| `GET /api/partida/{id}` | El estado actual. Con `?version=N` y sin cambios desde entonces, devuelve solo `{"version": N, "sin_cambios": true}` |
+| `POST /api/partida/{id}/accion` | Hacer tu jugada: `{"tipo": "sugerir", "cartas": ["chef_canela", "trofeo", "biblioteca"]}` o `{"tipo": "acusar", ...}` |
+| `POST /api/partida/{id}/carta` | Elegir qué carta enseñar al refutar: `{"carta": "trofeo"}` |
+| `DELETE /api/partida/{id}` | Abandonar la partida (se detiene su hilo) |
+| `GET /` y archivos de `web/` | La página |
+
+Los `POST` devuelven el estado enseguida; **la página consulta `GET` cada poco** (unos 700 ms) mientras juegan las IAs. Con `?version=N` no se transfiere nada si no ha cambiado.
+
+**El estado.** Es lo único que ve la página:
+
+```json
+{
+  "id": "a3f9c2",
+  "version": 17,
+  "estado": "esperando",
+  "turno": 1,
+  "jugadores": [
+    {"id": 1, "nombre": "Ana",  "nivel": null,    "cartas": 5, "eliminado": false},
+    {"id": 2, "nombre": "Beto", "nivel": "media", "cartas": 5, "eliminado": false},
+    {"id": 3, "nombre": "Cleo", "nivel": "facil", "cartas": 4, "eliminado": false}
+  ],
+  "mano": ["doctora_violeta", "daga", "cocina", "piscina", "tijeras"],
+  "historial": [
+    {"n": 1, "tipo": "sugerencia", "quien": 2,
+     "cartas": ["chef_canela", "veneno", "jardin"],
+     "respuestas": [{"jugador": 3, "resultado": "no_pudo"}, {"jugador": 1, "resultado": "refuto"}],
+     "carta_vista": null},
+    {"n": 2, "tipo": "acusacion", "quien": 3,
+     "cartas": ["senora_coral", "cuerda", "gimnasio"], "resultado": "falla"}
+  ],
+  "pendiente": {"tipo": "accion"},
+  "libreta": [
+    {"carta": "chef_canela", "tipo": "sospechoso", "estado": "descartada", "probabilidad": 0.0},
+    {"carta": "veneno", "tipo": "arma", "estado": "dudosa", "probabilidad": 18.4}
+  ],
+  "fin": null
+}
+```
+
+| Campo | Valores |
+|---|---|
+| `estado` | `jugando` (juega una IA), `esperando` (te toca: mira `pendiente`) o `fin` |
+| `pendiente` | `null`; `{"tipo": "accion"}` (sugerir o acusar); o `{"tipo": "carta", "sugerencia": {"quien": 2, "cartas": [...]}, "candidatas": [...]}` (tienes que refutar) |
+| `historial[].carta_vista` | Solo en tus sugerencias, y solo si alguien refutó: `{"jugador": 3, "carta": "daga"}`. En las de los demás, siempre `null` |
+| `libreta[].estado` | `descartada`, `dudosa` o `sobre` (lo que dice `deducir/2`) |
+| `libreta[].probabilidad` | Porcentaje de estar en el sobre (`probabilidades/2`); solo se recalcula cuando te toca |
+| `fin` | `null` o `{"ganador": 3, "motivo": "acierta", "sobre": [...], "eliminados": [...]}`. Si pierdes, `ganador` es `null` y `motivo` es `"eliminado"` |
+
+`nivel` es `facil`, `media` o `dificil` para las IAs, y `null` para ti. La página compone los textos ("Beto refutó") a partir de estos datos.
+
+**Qué no se cuenta nunca.** El sobre (hasta el `fin`), las manos de los demás, qué carta enseñó cada uno a otro jugador, y el conocimiento de las IAs. Es lo que ya garantiza el protocolo: la página recibe lo mismo que recibiría un jugador por la terminal.
+
+**La libreta es opcional.** Con `"asistente": false` el campo `libreta` es `null` y no se calcula nada. Con `true` (por defecto) se rellena con el conocimiento que el jugador `web` va acumulando con los mismos eventos que ve, usando el mismo motor que la IA media.
+
+**Errores.** `{"error": "codigo", "mensaje": "texto"}` con estos códigos: `partida_no_existe` (404), `rivales_invalidos` (400), `nivel_invalido` (400), `no_esperas_accion` (409), `accion_invalida` (400), `carta_invalida` (400).
+
+**Los nombres de las IAs** (Beto, Cleo...) los pone el servidor. El nombre del humano viene en `nombre`: se recorta a 20 caracteres y, si viene vacío, es "Detective".
+
 ## §4 La IA
 
 **Conocimiento.** Cada carta tiene un dueño desconocido: `0` es el sobre y `1..N` son los jugadores. Las observaciones se convierten en restricciones:
@@ -209,7 +285,7 @@ El bucle **solo** habla con los jugadores mediante el protocolo de arriba. No us
 | **F0 — Preparación** | antes del 26 oct | Repo, prototipo del motor de deducción y herramientas del repo |
 | **F1 — El modelo del juego** | 26 oct – 1 nov | Hay reparto aleatorio y la deducción funciona con el mazo completo y N jugadores, con tests |
 | **F2 — Partida en consola** | 2 – 8 nov | Se juega una partida completa en la terminal contra IAs fácil y media. **Versión mínima entregable** |
-| **F3 — Interfaz web e IA difícil** | 9 – 15 nov | Se juega en el navegador, con la libreta de detective de la IA y el nivel difícil |
+| **F3 — Interfaz web e IA difícil** | 9 – 15 nov | Se juega en el navegador contra IAs de distinto nivel (fácil, media y difícil), con una libreta asistida por el motor |
 | **F4 — Explicación, torneo y entrega** | 16 – 22 nov | La IA explica sus deducciones, hay estadísticas del torneo entre IAs, informe y demo listos |
 
 **Regla principal:** al final de F2 tiene que existir un juego completo en consola. Todo lo posterior es mejora.
