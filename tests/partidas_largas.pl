@@ -123,7 +123,7 @@ problema(_, _, _, _, _, _, Historial, _, juega_dos_veces_seguidas(Id)) :-
 problema(_, _, _, _, _, _, Historial, _, juega_un_eliminado(Id)) :-
     juega_tras_caer(Historial, [], Id).
 problema(_, _, _, _, Sobre, _, _, Jugadores, ia_media_descarta_el_sobre_real(Id)) :-
-    member(jugador(Id, media, K), Jugadores),
+    member(jugador(Id, media, mente(K, _)), Jugadores),
     posibles_en_sobre(K, Posibles),
     \+ forall(member(C, Sobre), memberchk(C, Posibles)).
 problema(_, _, _, _, Sobre, _, _, Jugadores, ia_facil_cree_vista_una_carta_del_sobre(Id)) :-

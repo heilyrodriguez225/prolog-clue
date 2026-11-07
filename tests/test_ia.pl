@@ -432,3 +432,48 @@ test(no_deja_puntos_de_eleccion) :-
     media_accion(K, _).
 
 :- end_tests(media_accion).
+
+:- begin_tests(media_carta_a_mostrar).
+
+test(con_una_sola_candidata_enseña_esa, [true(C == trofeo)]) :-
+    media_carta_a_mostrar([], 3, [trofeo], C, _).
+
+test(repite_la_que_ya_le_enseño_a_ese_jugador, [forall(between(1, 20, _))]) :-
+    media_carta_a_mostrar([3-sala_de_video], 3, [trofeo, sala_de_video, comedor], C, _),
+    C == sala_de_video.
+
+test(prefiere_la_que_ya_enseño_a_otro_antes_que_una_nueva) :-
+    forall(between(1, 30, _),
+           ( media_carta_a_mostrar([2-trofeo], 3, [sala_de_video, trofeo, comedor], C, _),
+             C == trofeo )).
+
+test(lo_que_enseño_a_ese_jugador_gana_a_lo_que_enseño_a_otro) :-
+    % A 3 ya le enseñó la sala de video; a 2, el trofeo. Con 3, repite la sala.
+    forall(between(1, 30, _),
+           ( media_carta_a_mostrar([2-trofeo, 3-sala_de_video], 3, [trofeo, sala_de_video], C, _),
+             C == sala_de_video )).
+
+test(sin_historial_elige_al_azar_entre_todas) :-
+    set_random(seed(5)),
+    findall(C, ( between(1, 200, _),
+                 media_carta_a_mostrar([], 3, [trofeo, sala_de_video, comedor], C, _) ), Cs),
+    forall(member(X, [trofeo, sala_de_video, comedor]), memberchk(X, Cs)).
+
+test(siempre_es_una_candidata) :-
+    forall(between(1, 100, _),
+           ( media_carta_a_mostrar([2-trofeo, 4-daga], 3, [sala_de_video, comedor], C, _),
+             memberchk(C, [sala_de_video, comedor]) )).
+
+test(recuerda_lo_que_ensena, [true(M == [3-trofeo])]) :-
+    media_carta_a_mostrar([], 3, [trofeo], _, M).
+
+test(no_duplica_entradas, [true(M == [3-trofeo])]) :-
+    media_carta_a_mostrar([3-trofeo], 3, [trofeo, comedor], _, M).
+
+test(añade_la_nueva_sin_perder_las_anteriores, [true(M == [4-trofeo, 3-trofeo])]) :-
+    media_carta_a_mostrar([3-trofeo], 4, [trofeo], _, M).
+
+test(es_determinista_al_repetir) :-
+    media_carta_a_mostrar([3-trofeo], 3, [trofeo, comedor], _, _).
+
+:- end_tests(media_carta_a_mostrar).

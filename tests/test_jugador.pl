@@ -36,7 +36,8 @@ test(la_ia_facil_empieza_viendo_su_mano,
 
 test(la_ia_media_empieza_con_su_conocimiento, [forall(member(Tipo, [media, dificil]))]) :-
     partida_de_prueba(P),
-    nuevo_jugador(3, Tipo, P, jugador(3, Tipo, K)),
+    nuevo_jugador(3, Tipo, P, jugador(3, Tipo, mente(K, Mostradas))),
+    Mostradas == [],                  % y todavía no ha enseñado ninguna carta
     % Lo único que sabe al empezar es su mano: 4 cartas descartadas.
     findall(C, estado_carta(K, C, descartada), Descartadas),
     msort(Descartadas, D),
@@ -74,7 +75,7 @@ test(cada_ia_conoce_solo_lo_suyo) :-
     % La mano del jugador 3 es desconocida para la IA 4, y al revés.
     partida_de_prueba(P),
     jugadores_iniciales(P, [humano, facil, media, media], Js),
-    Js = [_, _, jugador(3, _, K3), jugador(4, _, K4)],
+    Js = [_, _, jugador(3, _, mente(K3, _)), jugador(4, _, mente(K4, _))],
     once(estado_carta(K3, veneno, descartada)),
     once(estado_carta(K4, veneno, dudosa)),
     once(estado_carta(K4, tijeras, descartada)),
@@ -241,7 +242,7 @@ test(los_eventos_publicos_no_cambian_la_memoria_de_la_ia_facil) :-
 
 test(observar_actualiza_su_conocimiento_en_su_sitio) :-
     partida_de_prueba(P), nuevo_jugador(1, media, P, J),
-    J = jugador(1, media, K),
+    J = jugador(1, media, mente(K, _)),
     once(estado_carta(K, trofeo, dudosa)),
     observar(J, carta_vista(2, trofeo), J1),
     J1 == J,                                   % el mismo jugador: las restricciones viven en K
@@ -251,7 +252,7 @@ test(la_carta_vista_privada_solo_la_aprende_su_destinatario) :-
     partida_de_prueba(P),
     jugadores_iniciales(P, [azar, media, media, media], Js),
     observar_a(3, carta_vista(1, daga), Js, Js1),
-    Js1 = [_, jugador(2, media, K2), jugador(3, media, K3), jugador(4, media, K4)],
+    Js1 = [_, jugador(2, media, mente(K2, _)), jugador(3, media, mente(K3, _)), jugador(4, media, mente(K4, _))],
     once(estado_carta(K3, daga, descartada)),
     once(estado_carta(K2, daga, dudosa)),
     once(estado_carta(K4, daga, dudosa)).
@@ -262,7 +263,7 @@ test(un_evento_publico_lo_aprenden_todas) :-
     % Ni el 2 ni el 3 ni el 4 pueden tener ninguna de estas cartas... salvo el 3
     % que acaba de refutar: la IA 2 y la 4 deducen cosas distintas de lo mismo.
     observar_todos(sugerencia(1, [chef_canela, trofeo, cocina], [no_pudo(3)]), Js, Js1),
-    Js1 = [_, jugador(2, media, K2), _, jugador(4, media, K4)],
+    Js1 = [_, jugador(2, media, mente(K2, _)), _, jugador(4, media, mente(K4, _))],
     forall(member(K, [K2, K4]),
            ( K = conocimiento(_, Modelo),
              forall(member(C, [chef_canela, trofeo, cocina]),
@@ -350,3 +351,51 @@ test(el_humano_sigue_sin_memoria_aunque_hable, [true(M == [])]) :-
     J1 = jugador(1, humano, M).
 
 :- end_tests(humano).
+
+:- begin_tests(ia_media_al_refutar).
+
+% La IA media recuerda lo que enseña y repite la misma carta con cada jugador.
+refuta(J, Quien, Candidatas, Carta, J1) :-
+    elegir_carta_a_mostrar(J, sugerencia(Quien, [x, y, z]), Candidatas, Carta, J1).
+
+test(la_memoria_empieza_sin_cartas_ensenadas, [true(M == [])]) :-
+    partida_de_prueba(P), nuevo_jugador(2, media, P, jugador(2, media, mente(_, M))).
+
+test(recuerda_la_carta_que_ensena_y_a_quien, [true(M == [3-trofeo])]) :-
+    partida_de_prueba(P), nuevo_jugador(2, media, P, J),
+    refuta(J, 3, [trofeo], _, J1),
+    J1 = jugador(2, media, mente(_, M)).
+
+test(repite_la_misma_carta_con_el_mismo_jugador) :-
+    partida_de_prueba(P), nuevo_jugador(2, media, P, J),
+    refuta(J, 3, [trofeo, sala_de_video], C1, J1),
+    forall(between(1, 30, _),
+           ( refuta(J1, 3, [trofeo, sala_de_video], C, _), C == C1 )).
+
+test(no_duplica_lo_que_ya_recordaba) :-
+    partida_de_prueba(P), nuevo_jugador(2, media, P, J),
+    refuta(J, 3, [trofeo], _, J1),
+    refuta(J1, 3, [trofeo, sala_de_video], _, J2),
+    J2 = jugador(2, media, mente(_, M)),
+    M == [3-trofeo].
+
+test(con_otro_jugador_prefiere_una_carta_que_ya_ensenio) :-
+    partida_de_prueba(P), nuevo_jugador(2, media, P, J),
+    refuta(J, 3, [trofeo], _, J1),
+    forall(between(1, 30, _),
+           ( refuta(J1, 4, [trofeo, sala_de_video], C, _), C == trofeo )).
+
+test(la_carta_que_ensena_siempre_es_una_candidata) :-
+    partida_de_prueba(P), nuevo_jugador(2, media, P, J),
+    Candidatas = [trofeo, sala_de_video, comedor],
+    forall(between(1, 40, _),
+           ( refuta(J, 3, Candidatas, C, _), memberchk(C, Candidatas) )).
+
+test(el_conocimiento_no_cambia_al_refutar) :-
+    partida_de_prueba(P), nuevo_jugador(2, media, P, J),
+    refuta(J, 3, [trofeo, comedor], _, J1),
+    J = jugador(2, media, mente(K, _)),
+    J1 = jugador(2, media, mente(K1, _)),
+    K == K1.
+
+:- end_tests(ia_media_al_refutar).

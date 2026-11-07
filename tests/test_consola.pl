@@ -199,7 +199,8 @@ test(acusacion_ajena_que_acierta) :-
 test(acusacion_propia_que_falla) :-
     salida_de(1, acusacion(1, [chef_canela, trofeo, cocina], falla), S),
     contiene(S, "Acusas a:"),
-    contiene(S, "sigues refutando").
+    contiene(S, "Te has equivocado y quedas eliminado"),
+    \+ contiene(S, "sigues refutando").
 
 test(acusacion_propia_que_acierta) :-
     salida_de(1, acusacion(1, [chef_canela, trofeo, cocina], acierta), S),
@@ -249,5 +250,21 @@ test(si_no_hay_eliminados_no_los_menciona) :-
     partida_final([], P),
     ejecutar("", mostrar_fin(1, fin(2, acierta, P, [])), S),
     \+ contiene(S, "Eliminados").
+
+test(el_humano_pierde_por_acusar_mal) :-
+    partida_final([1], P),
+    ejecutar("", mostrar_fin(1, fin(ninguno, eliminado(1), P, [])), S),
+    contiene(S, "== Fin de la partida =="),
+    contiene(S, "Has perdido"),
+    contiene(S, "la partida termina aquí"),
+    contiene(S, "El sobre era: Señora Coral, Cuerda y Gimnasio."),
+    \+ contiene(S, "Gana "),
+    \+ contiene(S, "Eliminados, por orden").
+
+test(si_es_otro_el_eliminado_lo_dice) :-
+    partida_final([3], P),
+    ejecutar("", mostrar_fin(1, fin(ninguno, eliminado(3), P, [])), S),
+    contiene(S, "El jugador 3 queda eliminado y la partida termina"),
+    \+ contiene(S, "Has perdido").
 
 :- end_tests(fin_en_pantalla).

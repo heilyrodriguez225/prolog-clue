@@ -11,8 +11,10 @@
 
           azar, humano    []
           facil           vistas(Cartas)   las cartas que ha visto
-          media, dificil  K                el conocimiento de deduccion.pl,
-                                           con sus restricciones CLP(FD)
+          media, dificil  mente(K, Mostradas)
+                            K          el conocimiento de deduccion.pl,
+                                       con sus restricciones CLP(FD)
+                            Mostradas  las cartas que ha enseñado y a quién
 
     La memoria no se guarda con assert: el bucle de la partida lleva la
     lista de jugadores de turno en turno y cada operación devuelve el
@@ -65,9 +67,9 @@ memoria_inicial(humano, _, _, []).
 memoria_inicial(azar, _, _, []).
 memoria_inicial(facil, Id, Partida, vistas(Mano)) :-
     mano_de(Id, Partida, Mano).
-memoria_inicial(media, Id, Partida, K) :-
+memoria_inicial(media, Id, Partida, mente(K, [])) :-
     conocimiento_inicial(Id, Partida, K).
-memoria_inicial(dificil, Id, Partida, K) :-
+memoria_inicial(dificil, Id, Partida, mente(K, [])) :-
     conocimiento_inicial(Id, Partida, K).
 
 mano_de(Id, partida(_, Manos, _, _, _), Mano) :-
@@ -162,7 +164,8 @@ observar(Jugador, Evento, Jugador1) :-
 %                 no ha visto y acusa cuando solo le queda una de
 %                 cada tipo (ia.pl)
 %       media     convierte en restricciones todo lo que ve y deduce qué
-%                 puede estar en el sobre; acusa solo cuando es seguro (ia.pl)
+%                 puede estar en el sobre; acusa solo cuando es seguro; y al
+%                 refutar procura revelar lo menos posible (ia.pl)
 %       dificil   POR AHORA juega al azar; además elegirá la mejor
 %                 sugerencia                                          (#21)
 
@@ -174,7 +177,7 @@ elige_accion(facil,   J, _, Accion, J) :-
     J = jugador(_, facil, vistas(Vistas)),
     facil_accion(Vistas, Accion).
 elige_accion(media,   J, _, Accion, J) :-
-    J = jugador(_, media, K),
+    J = jugador(_, media, mente(K, _)),
     media_accion(K, Accion).
 elige_accion(dificil, J, _, Accion, J) :- accion_al_azar(Accion).
 
@@ -182,7 +185,9 @@ elige_carta(azar,    J, _, Candidatas, Carta, J) :- random_member(Carta, Candida
 elige_carta(humano,  J, Sugerencia, Candidatas, Carta, J) :-
     preguntar_carta(Sugerencia, Candidatas, Carta).
 elige_carta(facil,   J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
-elige_carta(media,   J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
+elige_carta(media, jugador(Id, media, mente(K, Mostradas)), sugerencia(Quien, _),
+            Candidatas, Carta, jugador(Id, media, mente(K, Mostradas1))) :-
+    media_carta_a_mostrar(Mostradas, Quien, Candidatas, Carta, Mostradas1).
 elige_carta(dificil, J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
 
 observa(azar,    J, _, J).
@@ -192,7 +197,7 @@ observa(humano, J, Evento, J) :-
 observa(facil, jugador(Id, facil, vistas(Vistas)), Evento, jugador(Id, facil, vistas(Vistas1))) :-
     facil_recordar(Evento, Vistas, Vistas1).
 observa(media, J, Evento, J) :-
-    J = jugador(Id, media, K),
+    J = jugador(Id, media, mente(K, _)),
     media_observar(Id, Evento, K).
 observa(dificil, J, _, J).
 

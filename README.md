@@ -32,7 +32,7 @@ Puedes elegir los rivales, de 2 a 4, entre `azar`, `facil` y `media`:
 swipl src/jugar.pl media media facil
 ```
 
-En tu turno puedes **sugerir** (preguntar a los demás si tienen alguna de tres cartas), **acusar** (decir cuál es el sobre: si te equivocas quedas eliminado, aunque sigues refutando) o ver el historial. Verás todo lo que hacen los demás, y la carta que te enseñan cuando sugieres. Gana quien acusa bien o el último que queda sin eliminar.
+En tu turno puedes **sugerir** (preguntar a los demás si tienen alguna de tres cartas), **acusar** (decir cuál es el sobre: si te equivocas pierdes y la partida termina) o ver el historial. Verás todo lo que hacen los demás, y la carta que te enseñan cuando sugieres. Gana quien acusa bien o el último que queda sin eliminar. Las IAs que se equivocan al acusar quedan eliminadas, pero siguen refutando.
 
 Un fragmento de partida:
 
@@ -80,7 +80,7 @@ La IA dedujo la solución sin haber visto esas cartas, solo a partir de quién r
 swipl -q -g run_tests -t halt tests/todos.pl
 ```
 
-Ejecuta los 316 tests (`tests/test_juego.pl`, `tests/test_deduccion.pl`, `tests/test_consola.pl`, `tests/test_ia.pl`, `tests/test_jugador.pl`, `tests/test_turnos.pl` y `tests/test_sherlog.pl`, con [plunit](https://www.swi-prolog.org/pldoc/man?section=plunit)). Muestra el progreso, marca con `FAILED` los que fallen y termina con código 0 si todos pasan o con 1 si alguno falla (se comprueba con `echo $status` en fish, o `echo $?` en bash). Tarda unos 30 segundos (los tests de probabilidades y las partidas completas con la IA media son los más lentos). Los de la consola no usan el teclado: leen de un texto y escriben en otro.
+Ejecuta los 349 tests (`tests/test_juego.pl`, `tests/test_deduccion.pl`, `tests/test_consola.pl`, `tests/test_ia.pl`, `tests/test_jugador.pl`, `tests/test_turnos.pl` y `tests/test_sherlog.pl`, con [plunit](https://www.swi-prolog.org/pldoc/man?section=plunit)). Muestra el progreso, marca con `FAILED` los que fallen y termina con código 0 si todos pasan o con 1 si alguno falla (se comprueba con `echo $status` en fish, o `echo $?` en bash). Tarda unos 30 segundos (los tests de probabilidades y las partidas completas con la IA media son los más lentos). Los de la consola no usan el teclado: leen de un texto y escriben en otro.
 
 Para ejecutar solo un archivo:
 

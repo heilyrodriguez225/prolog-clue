@@ -95,7 +95,7 @@ mostrar_evento(Yo, acusacion(Quien, Cartas, Resultado)) :-
     ->  format("Acusas a: ~w.~n", [Texto]),
         (   Resultado == acierta
         ->  format("  ¡Has acertado!~n")
-        ;   format("  Te has equivocado y quedas eliminado: ya no juegas turno, pero sigues refutando.~n")
+        ;   format("  Te has equivocado y quedas eliminado.~n")
         )
     ;   format("El jugador ~w acusa a: ~w.~n", [Quien, Texto]),
         (   Resultado == acierta
@@ -133,20 +133,31 @@ mostrar_respuesta(Yo, refuto(J)) :-
 
 %!  mostrar_fin(+Yo, +Resultado) is det.
 %
-%   El final de la partida: quién gana, por qué y cuál era el sobre.
+%   El final de la partida: quién gana (o que has perdido), por qué y
+%   cuál era el sobre.
 
 mostrar_fin(Yo, fin(Ganador, Motivo, partida(sobre(S, A, L), _, _, Eliminados, _), _)) :-
     format("~n== Fin de la partida ==~n"),
-    jugador_texto(Yo, Ganador, Quien),
-    (   Motivo == acierta
-    ->  format("Gana ~w: acusó correctamente.~n", [Quien])
-    ;   format("Gana ~w: es el único jugador que queda sin eliminar.~n", [Quien])
-    ),
+    mostrar_motivo(Yo, Ganador, Motivo),
     lista_de_nombres([S, A, L], Sobre),
     format("El sobre era: ~w.~n", [Sobre]),
-    (   Eliminados == []
+    (   Motivo = eliminado(_)
+    ->  true
+    ;   Eliminados == []
     ->  true
     ;   format("Eliminados, por orden: ~w.~n", [Eliminados])
+    ).
+
+mostrar_motivo(Yo, Ganador, acierta) :-
+    jugador_texto(Yo, Ganador, Quien),
+    format("Gana ~w: acusó correctamente.~n", [Quien]).
+mostrar_motivo(Yo, Ganador, ultimo) :-
+    jugador_texto(Yo, Ganador, Quien),
+    format("Gana ~w: es el único jugador que queda sin eliminar.~n", [Quien]).
+mostrar_motivo(Yo, _, eliminado(Id)) :-
+    (   Id == Yo
+    ->  format("Has perdido: te has equivocado al acusar y quedas eliminado, así que la partida termina aquí.~n")
+    ;   format("El jugador ~w queda eliminado y la partida termina.~n", [Id])
     ).
 
 %   ---------------------------------------------------------------------

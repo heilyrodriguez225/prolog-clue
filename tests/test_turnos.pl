@@ -810,3 +810,112 @@ eventos_medios(Tipos, Partidas, Media) :-
     Media is S / N.
 
 :- end_tests(ia_media_en_partidas).
+
+:- begin_tests(termina_si_cae).
+
+% Cuatro jugadores al azar, con el turno y los eliminados que se indiquen.
+con_azar(Turno, Eliminados, P, Js) :-
+    partida_en_turno(Turno, Eliminados, P),
+    jugadores_iniciales(P, [azar, azar, azar, azar], Js).
+
+test(si_ya_esta_eliminado_la_partida_termina_sin_jugar) :-
+    con_azar(2, [1], P, Js),
+    jugar(P, Js, [termina_si_cae(1)], Resultado),
+    Resultado == fin(ninguno, eliminado(1), P, Js).
+
+test(no_hay_ganador_cuando_termina_asi) :-
+    con_azar(2, [1], P, Js),
+    jugar(P, Js, [termina_si_cae(1)], fin(Ganador, Motivo, _, _)),
+    Ganador == ninguno,
+    Motivo == eliminado(1).
+
+test(sin_la_opcion_la_partida_sigue_aunque_el_jugador_este_eliminado) :-
+    con_azar(2, [1], P, Js),
+    jugar(P, Js, fin(Ganador, Motivo, partida(_, _, _, _, H), _)),
+    integer(Ganador), Ganador > 1,
+    memberchk(Motivo, [acierta, ultimo]),
+    H = [_|_].
+
+test(la_opcion_de_otro_jugador_no_afecta, [forall(member(Opcion, [termina_si_cae(3), termina_si_cae(4)]))]) :-
+    % Los jugadores 3 y 4 son IAs fáciles, que nunca se equivocan al acusar:
+    % la opción de uno de ellos no puede dispararse, y la partida llega al final.
+    partida_en_turno(2, [1], P),
+    jugadores_iniciales(P, [azar, azar, facil, facil], Js),
+    jugar(P, Js, [Opcion], fin(Ganador, Motivo, partida(_, _, _, _, H), _)),
+    integer(Ganador),
+    memberchk(Motivo, [acierta, ultimo]),
+    H = [_|_].
+
+test(con_varias_opciones_vale_cualquiera_de_ellas) :-
+    con_azar(2, [3], P, Js),
+    jugar(P, Js, [termina_si_cae(1), termina_si_cae(3)], Resultado),
+    Resultado = fin(ninguno, eliminado(3), _, _).
+
+test(acusar_mal_con_la_opcion_termina_de_inmediato) :-
+    con_azar(1, [], P, Js),
+    aplicar_accion(acusar(chef_canela, trofeo, cocina), P, Js, [termina_si_cae(1)], Resultado),
+    Resultado = fin(Ganador, Motivo, partida(_, _, _, Eliminados, Historial), _),
+    Ganador == ninguno,
+    Motivo == eliminado(1),
+    Eliminados == [1],
+    Historial == [acusacion(1, [chef_canela, trofeo, cocina], falla)].
+
+test(acusar_mal_sin_la_opcion_la_partida_sigue) :-
+    con_azar(1, [], P, Js),
+    aplicar_accion(acusar(chef_canela, trofeo, cocina), P, Js, Resultado),
+    Resultado = fin(Ganador, _, partida(_, _, _, [1|_], Historial), _),
+    integer(Ganador),
+    Historial = [acusacion(1, _, falla), _|_].
+
+test(acertar_con_la_opcion_gana_como_siempre) :-
+    con_azar(1, [], P, Js),
+    aplicar_accion(acusar(senora_coral, cuerda, gimnasio), P, Js, [termina_si_cae(1)], Resultado),
+    Resultado = fin(Ganador, Motivo, _, _),
+    Ganador == 1, Motivo == acierta.
+
+test(sugerir_con_la_opcion_no_termina_la_partida) :-
+    con_azar(1, [], P, Js),
+    aplicar_accion(sugerir(entrenador_cobalto, veneno, estudio), P, Js, [termina_si_cae(1)], Resultado),
+    Resultado = fin(_, _, partida(_, _, _, _, [sugerencia(1, _, _), _|_]), _).
+
+test(otro_jugador_que_acusa_mal_no_termina_la_partida) :-
+    % Acusa mal el 2 y la opción es del 1, que es una IA fácil y nunca cae:
+    % la partida sigue hasta el final.
+    partida_en_turno(2, [], P),
+    jugadores_iniciales(P, [facil, azar, azar, azar], Js),
+    aplicar_accion(acusar(chef_canela, trofeo, cocina), P, Js, [termina_si_cae(1)], Resultado),
+    Resultado = fin(Ganador, _, partida(_, _, _, Eliminados, _), _),
+    integer(Ganador),
+    memberchk(2, Eliminados).
+
+test(sin_opciones_jugar_3_y_jugar_4_hacen_lo_mismo) :-
+    set_random(seed(11)),
+    iniciar_partida([azar, facil, azar, facil], P1, Js1), jugar(P1, Js1, R1),
+    set_random(seed(11)),
+    iniciar_partida([azar, facil, azar, facil], P2, Js2), jugar(P2, Js2, [], R2),
+    R1 = fin(G1, M1, partida(_, _, _, E1, H1), _),
+    R2 = fin(G2, M2, partida(_, _, _, E2, H2), _),
+    G1 == G2, M1 == M2, E1 == E2, H1 == H2.
+
+test(la_partida_nunca_sigue_despues_de_eliminar_al_jugador, [forall(member(N, [3, 4, 5]))]) :-
+    % El jugador 1 juega al azar y acusa a veces, casi siempre mal. Tras
+    % varios turnos de sugerencias, la opción tiene que seguir activa: en
+    % cuanto cae, la partida termina y su acusación es lo último del historial.
+    length(Resto, N), Resto = [_|Otros], maplist(=(facil), Otros),
+    Tipos = [azar|Otros],
+    findall(Cayo,
+            ( between(1, 50, _),
+              iniciar_partida(Tipos, P, Js),
+              jugar(P, Js, [termina_si_cae(1)], fin(G, M, partida(_, _, _, El, H), _)),
+              (   memberchk(1, El)
+              ->  G == ninguno, M == eliminado(1),
+                  last(H, acusacion(1, _, falla)),
+                  Cayo = si
+              ;   integer(G), Cayo = no
+              ) ),
+            Resultados),
+    length(Resultados, 50),
+    aggregate_all(count, member(si, Resultados), Cayeron),
+    Cayeron >= 5.                          % que la comprobación no sea vacía
+
+:- end_tests(termina_si_cae).

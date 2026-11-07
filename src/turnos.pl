@@ -40,7 +40,9 @@
             jugadores_en_juego/2,
             siguiente_turno/2,
             aplicar_accion/4,
-            jugar/3
+            aplicar_accion/5,
+            jugar/3,
+            jugar/4
           ]).
 
 :- use_module(library(error)).
@@ -288,41 +290,66 @@ siguiente_turno(partida(Sobre, Manos, Turno, Eliminados, Historial),
 %   fallo de algún jugador (por ejemplo, que nunca acuse), no algo normal.
 
 jugar(Partida, Jugadores, Resultado) :-
+    jugar(Partida, Jugadores, [], Resultado).
+
+%!  jugar(+Partida, +Jugadores, +Opciones, -Resultado) is det.
+%
+%   Como jugar/3, con Opciones:
+%
+%       termina_si_cae(Id)   si el jugador Id queda eliminado, la partida
+%                            termina en ese momento, sin ganador:
+%                            fin(ninguno, eliminado(Id), Partida, Jugadores)
+%
+%   Es lo que se usa con el jugador humano: cuando se equivoca no tiene
+%   sentido que la partida siga solo entre IAs mientras él mira.
+%   Sin opciones el bucle se comporta como siempre, y un eliminado sigue
+%   refutando.
+
+jugar(Partida, Jugadores, Opciones, Resultado) :-
+    Partida = partida(_, _, _, Eliminados, _),
     jugadores_en_juego(Partida, Ids),
-    (   Ids = [Ganador]
+    (   member(termina_si_cae(Id), Opciones),
+        memberchk(Id, Eliminados)
+    ->  Resultado = fin(ninguno, eliminado(Id), Partida, Jugadores)
+    ;   Ids = [Ganador]
     ->  Resultado = fin(Ganador, ultimo, Partida, Jugadores)
     ;   comprobar_que_no_se_eterniza(Partida),
-        un_turno_completo(Partida, Jugadores, Resultado)
+        un_turno_completo(Partida, Jugadores, Opciones, Resultado)
     ).
 
-un_turno_completo(Partida, Jugadores, Resultado) :-
+un_turno_completo(Partida, Jugadores, Opciones, Resultado) :-
     accion_del_turno(Partida, Jugadores, Accion, Jugadores1),
-    aplicar_accion(Accion, Partida, Jugadores1, Resultado).
+    aplicar_accion(Accion, Partida, Jugadores1, Opciones, Resultado).
 
 %!  aplicar_accion(+Accion, +Partida, +Jugadores, -Resultado) is det.
+%!  aplicar_accion(+Accion, +Partida, +Jugadores, +Opciones, -Resultado) is det.
 %
 %   El jugador al que le toca hace la Accion elegida. Si sugiere, se
 %   resuelve la sugerencia y el juego sigue con el siguiente turno. Si
 %   acusa, se resuelve la acusación: si acierta la partida termina, y si
-%   falla sigue con el siguiente turno.
-%   Resultado es el de jugar/3.
+%   falla sigue con el siguiente turno (salvo que una de las Opciones
+%   haga terminar la partida).
+%   Resultado es el de jugar/4.
 
 aplicar_accion(Accion, Partida, Jugadores, Resultado) :-
+    aplicar_accion(Accion, Partida, Jugadores, [], Resultado).
+
+aplicar_accion(Accion, Partida, Jugadores, Opciones, Resultado) :-
     Partida = partida(_, _, Turno, _, _),
     (   Accion = sugerir(S, A, L)
     ->  jugar_sugerencia(Partida, Jugadores, Turno, [S, A, L], Partida1, Jugadores1),
-        pasar_al_siguiente(Partida1, Jugadores1, Resultado)
+        pasar_al_siguiente(Partida1, Jugadores1, Opciones, Resultado)
     ;   Accion = acusar(S, A, L),
         jugar_acusacion(Partida, Jugadores, Turno, [S, A, L], Acierto, Partida1, Jugadores1),
         (   Acierto == acierta
         ->  Resultado = fin(Turno, acierta, Partida1, Jugadores1)
-        ;   pasar_al_siguiente(Partida1, Jugadores1, Resultado)
+        ;   pasar_al_siguiente(Partida1, Jugadores1, Opciones, Resultado)
         )
     ).
 
-pasar_al_siguiente(Partida, Jugadores, Resultado) :-
+pasar_al_siguiente(Partida, Jugadores, Opciones, Resultado) :-
     siguiente_turno(Partida, Partida1),
-    jugar(Partida1, Jugadores, Resultado).
+    jugar(Partida1, Jugadores, Opciones, Resultado).
 
 % Cada sugerencia o acusación deja un evento en el historial.
 limite_de_eventos(1000).

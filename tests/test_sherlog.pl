@@ -62,15 +62,37 @@ test(el_humano_ve_las_jugadas_de_los_demas) :-
     aparece(Salida, "El jugador 2 sugiere"),
     aparece(Salida, "El jugador 3 sugiere").
 
-test(el_humano_que_acusa_mal_queda_eliminado_y_la_partida_sigue) :-
+test(el_humano_que_acusa_mal_pierde_y_la_partida_termina) :-
     % Acusa en su primer turno con las primeras cartas de cada menú: casi
-    % seguro que falla. Después ya no juega turno, pero sigue refutando.
+    % seguro que falla. Entonces queda eliminado y la partida termina ahí.
     set_random(seed(5)),
     con_unos("2\n1\n1\n1\n1\n", Entrada),
     jugar_con_entrada(Entrada, [facil, facil], Salida),
     aparece(Salida, "Te has equivocado y quedas eliminado"),
     aparece(Salida, "== Fin de la partida =="),
-    aparece(Salida, "Eliminados, por orden: [1").
+    aparece(Salida, "Has perdido"),
+    aparece(Salida, "El sobre era:"),
+    \+ aparece(Salida, "Gana ").
+
+test(tras_perder_no_se_juega_ningun_turno_mas) :-
+    % Después del aviso de que se ha equivocado no hay ni sugerencias de las
+    % IAs ni otro turno: la partida no sigue solo entre IAs.
+    set_random(seed(5)),
+    con_unos("2\n1\n1\n1\n1\n", Entrada),
+    jugar_con_entrada(Entrada, [facil, facil], Salida),
+    once(sub_string(Salida, Pos, _, _, "Te has equivocado")),
+    sub_string(Salida, Pos, _, 0, Resto),
+    \+ aparece(Resto, "sugiere"),
+    \+ aparece(Resto, "== Tu turno =="),
+    aparece(Resto, "== Fin de la partida ==").
+
+test(si_pierde_el_humano_la_partida_no_pide_mas_entrada) :-
+    % Con la entrada justa para acusar (y nada más) la partida acaba bien: no
+    % se queda esperando ni abandona por falta de entrada.
+    set_random(seed(5)),
+    jugar_con_entrada("2\n1\n1\n1\n1\n", [facil, facil], Salida),
+    aparece(Salida, "Has perdido"),
+    \+ aparece(Salida, "Partida abandonada").
 
 test(si_se_acaba_la_entrada_la_partida_se_abandona) :-
     jugar_con_entrada("", [facil, facil], Salida),

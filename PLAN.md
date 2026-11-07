@@ -20,7 +20,7 @@ Basadas en Clue, simplificadas para que todo el esfuerzo vaya a la parte declara
 | Tablero | **No hay tablero ni dados.** En su turno, cada jugador sugiere cualquier lugar |
 | Sugerencia | "Fue X con Y en Z". Se pregunta en orden a los siguientes jugadores; el primero que tenga alguna de las tres cartas enseña **una** solo a quien sugirió |
 | Lo que ven los demás | Quién refutó y quién no pudo, pero no la carta enseñada |
-| Acusación | Si acierta, gana. Si falla, queda eliminado pero sigue refutando |
+| Acusación | Si acierta, gana. Si falla, queda eliminado pero sigue refutando. **Excepción: si es el humano, la partida termina**: no tiene sentido que siga solo entre IAs mientras él mira |
 
 **Por qué 2–4 IAs:** con 4 jugadores cada uno tiene 4 o 5 cartas y la partida queda equilibrada. Con 6, las partidas se alargan, la IA difícil es más lenta (hay más respuestas posibles para cada sugerencia) y el torneo tiene muchas más combinaciones. El motor es genérico para N jugadores, así que ampliar a 5 IAs es cambiar un número.
 
@@ -103,7 +103,7 @@ jugador(Id, Tipo, Memoria)
 |---|---|---|
 | `azar`, `humano` | `[]` | Nada: el humano ve por la consola y el de azar no aprende |
 | `facil` | `vistas(Cartas)` | Las cartas que ha visto |
-| `media`, `dificil` | `conocimiento(Yo, P)` | El modelo CLP(FD) de `deduccion.pl`, con sus restricciones |
+| `media`, `dificil` | `mente(K, Mostradas)` | `K`: el modelo CLP(FD) de `deduccion.pl`, con sus restricciones. `Mostradas`: las cartas que ha enseñado y a quién |
 
 La memoria **nunca se guarda con `assert`** (se perderían las restricciones). Cada operación devuelve el jugador con la memoria actualizada.
 
@@ -161,7 +161,7 @@ Lo que le ocurre a la propia IA no aporta nada: si ella no pudo refutar o refut�
 | `azar` | Al azar, siempre | (es el nivel más bajo, la referencia con la que comparar a los demás) |
 | `humano` | **Hecho (#12):** pregunta por la terminal y cuenta lo que ocurre | |
 | `facil` | **Hecho (#13):** recuerda las cartas que le enseñan, sugiere entre las que no ha visto y acusa cuando le queda una sola de cada tipo | |
-| `media` | **Hecho (#14):** convierte en restricciones todo lo que ve, deduce qué cartas pueden estar en el sobre, sugiere entre ellas y acusa solo cuando es seguro | Elegirá mejor qué carta enseñar (#15) |
+| `media` | **Hecho (#14):** convierte en restricciones todo lo que ve, deduce qué cartas pueden estar en el sobre, sugiere entre ellas, acusa solo cuando es seguro y, al refutar, **hecho (#15)** procura revelar lo menos posible: repite la carta que ya enseñó a ese jugador | |
 | `dificil` | Al azar | Además elige la mejor sugerencia (#21) |
 
 ### El bucle de la partida (`turnos.pl`)
@@ -197,7 +197,7 @@ El bucle **solo** habla con los jugadores mediante el protocolo de arriba. No us
 | Nivel | Comportamiento |
 |---|---|
 | Fácil | Sugiere al azar entre las cartas que no ha visto, solo recuerda las que le enseñan y acusa cuando le queda una sola de cada tipo |
-| Medio | Convierte en restricciones lo que ve (sugerencias de todos, quién no pudo refutar, cartas que le enseñan y acusaciones fallidas), sugiere entre las cartas que aún pueden estar en el sobre y acusa solo cuando `solucion_segura/2` lo demuestra |
+| Medio | Convierte en restricciones lo que ve (sugerencias de todos, quién no pudo refutar, cartas que le enseñan y acusaciones fallidas), sugiere entre las cartas que aún pueden estar en el sobre y acusa solo cuando `solucion_segura/2` lo demuestra. Al refutar repite la carta que ya enseñó a ese jugador, para no regalar información |
 | Difícil | Además elige la sugerencia que más reduce la incertidumbre (ganancia de información) |
 
 **Riesgo conocido.** Con 21 cartas no se pueden enumerar todos los mundos posibles. Para saber qué cartas *pueden* estar en el sobre basta con comprobar, carta por carta, si existe al menos un mundo coherente. Las probabilidades se aproximan por muestreo (F1·04, F1·05).

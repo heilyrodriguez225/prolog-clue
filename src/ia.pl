@@ -21,7 +21,8 @@
             facil_sugerencia/2,
             facil_accion/2,
             media_observar/3,
-            media_accion/2
+            media_accion/2,
+            media_carta_a_mostrar/5
           ]).
 
 :- use_module(library(lists)).
@@ -172,4 +173,35 @@ una_de(Tipo, Cartas, Carta) :-
     (   Cartas == []
     ->  existence_error(carta_posible, Tipo)
     ;   random_member(Carta, Cartas)
+    ).
+
+%!  media_carta_a_mostrar(+Mostradas, +Quien, +Candidatas, -Carta, -Mostradas1) is det.
+%
+%   La IA media tiene que refutar una sugerencia de Quien y tiene las
+%   Candidatas. Elige cuál enseñar procurando dar la menor información
+%   posible. Mostradas es lo que ya ha enseñado, una lista de Jugador-Carta.
+%
+%   Cada carta que enseña le dice a quien la ve que no está en el sobre y
+%   que la tiene ella. Por eso:
+%
+%       1. Si ya le enseñó a Quien alguna de las Candidatas, repite esa:
+%          no le cuenta nada nuevo.
+%       2. Si no, prefiere una que ya haya enseñado a otro jugador: así se
+%          descubren menos cartas distintas de su mano.
+%       3. Si no hay ninguna, una al azar.
+%
+%   Mostradas1 recuerda lo que acaba de enseñar, sin repetir entradas.
+
+media_carta_a_mostrar(Mostradas, Quien, Candidatas, Carta, Mostradas1) :-
+    (   member(Repetida, Candidatas),
+        memberchk(Quien-Repetida, Mostradas)
+    ->  Carta = Repetida
+    ;   findall(C, ( member(C, Candidatas), memberchk(_-C, Mostradas) ), YaEnseniadas),
+        YaEnseniadas = [_|_]
+    ->  random_member(Carta, YaEnseniadas)
+    ;   random_member(Carta, Candidatas)
+    ),
+    (   memberchk(Quien-Carta, Mostradas)
+    ->  Mostradas1 = Mostradas
+    ;   Mostradas1 = [Quien-Carta|Mostradas]
     ).

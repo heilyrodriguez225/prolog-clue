@@ -42,7 +42,8 @@ rivales_validos(Rivales) :-
 %
 %   Juega una partida con el humano como jugador 1 y las IAs de la lista
 %   como jugadores 2, 3...: jugar_en_consola([media, facil]) es una
-%   partida de 3. Si la entrada se acaba, la partida se abandona.
+%   partida de 3. Si la entrada se acaba, la partida se abandona. Si el
+%   humano se equivoca al acusar, queda eliminado y la partida termina.
 
 jugar_en_consola(Rivales) :-
     catch(partida(Rivales),
@@ -52,7 +53,7 @@ jugar_en_consola(Rivales) :-
 partida(Rivales) :-
     iniciar_partida([humano|Rivales], Partida, Jugadores),
     presentar(Rivales),
-    jugar(Partida, Jugadores, Resultado),
+    jugar(Partida, Jugadores, [termina_si_cae(1)], Resultado),
     mostrar_fin(1, Resultado).
 
 presentar(Rivales) :-
