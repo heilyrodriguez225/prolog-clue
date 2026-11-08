@@ -91,6 +91,10 @@
       <div class="ayuda">👁 Un desafío equilibrado</div>
     </div>
 
+    <div class="campo">
+      <label class="casilla"><input type="checkbox" id="asistente" checked> Libreta asistida (el motor deduce por ti)</label>
+      <label class="casilla"><input type="checkbox" id="espectador"> Modo demo: ver pensar a la IA (juega ella, no tú)</label>
+    </div>
     <a class="cta" href="index.html" id="entrar">
       <span>
         <span class="etq">La partida está lista</span>
@@ -125,6 +129,12 @@
   }
   exclusivo('rivales', '.op-rival');
   exclusivo('dificultad', '.op-dificultad');
+  // La demo necesita la libreta: encenderla y no dejar apagarla.
+  document.getElementById('espectador').addEventListener('change', (ev) => {
+    const a = document.getElementById('asistente');
+    if (ev.target.checked) a.checked = true;
+    a.disabled = ev.target.checked;
+  });
 
   // La dificultad de la maqueta es una sola para todos; la elección por rival es la #22.
   const NIVELES = { facil: 'facil', medio: 'media', dificil: 'dificil' };
@@ -135,7 +145,8 @@
     const nivel = NIVELES[document.querySelector('#dificultad .sel').dataset.valor];
     // La IA difícil aún no existe (#21): se juega con la media.
     const real = nivel === 'dificil' ? 'media' : nivel;
-    const cuerpo = { nombre: nombre.value, rivales: Array.from({ length: cuantos }, () => ({ nivel: real })) };
+    const espectador = document.getElementById('espectador').checked;
+    const cuerpo = { nombre: nombre.value, asistente: espectador || document.getElementById('asistente').checked, modo: espectador ? 'espectador' : 'jugar', rivales: Array.from({ length: cuantos }, () => ({ nivel: real })) };
     try {
       const r = await fetch('/api/partida', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo),

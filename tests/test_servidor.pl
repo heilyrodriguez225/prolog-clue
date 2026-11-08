@@ -10,7 +10,7 @@
 :- use_module('../src/juego', [carta/2]).
 
 % Espera a que la partida pida algo (o termine) y devuelve el estado.
-esperar_estado(Id, Estado) :- esperar_estado(Id, 400, Estado).
+esperar_estado(Id, Estado) :- esperar_estado(Id, 1200, Estado).
 esperar_estado(Id, N, Estado) :-
     api_estado(Id, -1, E),
     (   memberchk(E.estado, [esperando, fin, error]) -> Estado = E
@@ -220,6 +220,101 @@ una_partida_al_azar :-
     api_abandonar(Id).
 
 :- end_tests(api_partida_completa).
+
+%   La libreta asistida y el modo espectador (#20)
+
+% Como jugar_al_azar, pero guardando la libreta de cada vez que te toca.
+jugar_guardando_libretas(Id, Libretas, Final) :-
+    esperar_estado(Id, E),
+    (   E.estado == fin -> Libretas = [], Final = E
+    ;   E.estado == error -> throw(error_en_partida(E))
+    ;   Libretas = [E.libreta|Resto],
+        (   E.pendiente.tipo == accion
+        ->  findall(C, carta(sospechoso, C), Ss), findall(C, carta(arma, C), As),
+            findall(C, carta(lugar, C), Ls),
+            random_member(S, Ss), random_member(A, As), random_member(L, Ls),
+            (   maybe(1, 12) -> Tipo = acusar ; Tipo = sugerir ),
+            api_accion(Id, _{tipo: Tipo, cartas: [S, A, L]}, _)
+        ;   random_member(C, E.pendiente.candidatas),
+            api_carta(Id, _{carta: C}, _)
+        ),
+        jugar_guardando_libretas(Id, Resto, Final)
+    ).
+
+libreta_coherente(Sobre, Libreta) :-
+    forall(member(L, Libreta),
+           (   number(L.probabilidad),
+               L.probabilidad >= 0.0, L.probabilidad =< 100.0,
+               (   L.estado == descartada -> L.probabilidad =:= 0.0 ; true ),
+               (   L.estado == sobre -> L.probabilidad =:= 100.0 ; true ),
+               % la carta del sobre nunca se marca como descartada
+               \+ ( memberchk(L.carta, Sobre), L.estado == descartada )
+           )).
+
+:- begin_tests(libreta_asistida).
+
+test(la_libreta_nunca_descarta_el_sobre) :-
+    forall(between(1, 5, _), una_partida_con_libretas).
+
+una_partida_con_libretas :-
+    crear([_{nivel: "facil"}, _{nivel: "media"}, _{nivel: "azar"}], Id, _),
+    jugar_guardando_libretas(Id, Libretas, F),
+    maplist(libreta_coherente(F.fin.sobre), Libretas),
+    api_abandonar(Id).
+
+test(los_porcentajes_cambian_tras_jugar) :-
+    crear([_{nivel: "media"}, _{nivel: "media"}], Id, _),
+    esperar_estado(Id, E0),
+    findall(X, ( carta(sospechoso, X), \+ memberchk(X, E0.mano) ), [S|_]),
+    findall(X, ( carta(arma, X), \+ memberchk(X, E0.mano) ), [A|_]),
+    findall(X, ( carta(lugar, X), \+ memberchk(X, E0.mano) ), [L|_]),
+    api_accion(Id, _{tipo: sugerir, cartas: [S, A, L]}, _),
+    esperar_cambio(Id, E0.version, E1),
+    E1.estado == esperando,
+    maplist([P]>>get_dict(probabilidad, P, _), E1.libreta),
+    findall(P, ( member(X, E0.libreta), get_dict(probabilidad, X, P) ), Antes),
+    findall(P, ( member(X, E1.libreta), get_dict(probabilidad, X, P) ), Despues),
+    Antes \== Despues,
+    api_abandonar(Id).
+
+esperar_cambio(Id, Version, E) :-
+    esperar_estado(Id, E1),
+    (   E1.version > Version, E1.estado \== jugando -> E = E1
+    ;   sleep(0.05), esperar_cambio(Id, Version, E)
+    ).
+
+test(sin_asistente_no_hay_libreta) :-
+    api_crear(_{nombre: "Ana", asistente: false,
+                rivales: [_{nivel: "facil"}, _{nivel: "facil"}]}, E0),
+    esperar_estado(E0.id, E),
+    E.libreta == null,
+    api_abandonar(E0.id).
+
+test(espectador_necesita_asistente, [true(C == modo_invalido)]) :-
+    codigo(api_crear(_{asistente: false, modo: "espectador",
+                       rivales: [_{nivel: "facil"}, _{nivel: "facil"}]}, _), C).
+
+test(espectador_juega_sola_y_la_libreta_llega_al_100) :-
+    forall(between(1, 2, _), una_partida_espectador).
+
+una_partida_espectador :-
+    api_crear(_{nombre: "IA", modo: "espectador",
+                rivales: [_{nivel: "facil"}, _{nivel: "azar"}]}, E0),
+    E0.modo == espectar,
+    Id = E0.id,
+    esperar_estado(Id, F),
+    F.estado == fin,
+    F.pendiente == null,
+    libreta_coherente(F.fin.sobre, F.libreta),
+    (   F.fin.ganador =:= 1, F.fin.motivo == acierta
+    ->  forall(member(C, F.fin.sobre),
+               ( member(L, F.libreta), L.carta == C,
+                 L.estado == sobre, L.probabilidad =:= 100.0 ))
+    ;   true
+    ),
+    api_abandonar(Id).
+
+:- end_tests(libreta_asistida).
 
 :- begin_tests(hilos_y_limpieza).
 

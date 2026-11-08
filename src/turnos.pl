@@ -47,6 +47,7 @@
 
 :- use_module(library(error)).
 :- use_module(library(lists)).
+:- use_module(library(apply)).
 :- use_module(juego).
 :- use_module(jugador).
 

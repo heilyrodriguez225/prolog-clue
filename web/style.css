@@ -449,4 +449,15 @@ dialog#dialogo .botones { display: flex; gap: 10px; margin-top: 14px; }
 .aviso-turno { font-size: 13px; color: var(--suave); margin: 10px 0 0; min-height: 1.2em; }
 .aviso-turno.tu-turno { color: var(--vino); font-weight: 600; }
 button:disabled, select:disabled { opacity: .5; cursor: not-allowed; }
-.fila-carta.sobre .estado-ico { color: var(--dorado); border-color: var(--dorado); }
+.fila-carta.segura .estado-ico { color: var(--dorado); border-color: var(--dorado); }
+
+/* --- Libreta asistida (#20) --- */
+.fila-carta .nombre { white-space: nowrap; }
+.fila-carta .pct { margin-left: auto; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--suave); }
+.fila-carta.sospechoso .pct { color: var(--dorado-tenue); font-weight: 600; }
+.fila-carta.segura { background: rgba(176, 138, 62, .18); font-weight: 700; }
+.fila-carta.segura .estado-ico { background: var(--dorado); border-color: var(--dorado); color: #fff; }
+.fila-carta.segura .pct { color: var(--vino); font-weight: 700; }
+.nota-asistente { font-size: 12px; color: var(--suave); margin: 8px 4px 0; }
+.casilla { display: flex; gap: 8px; align-items: center; font-size: 13px; margin: 4px 0; }
+.leyenda { flex-wrap: wrap; }

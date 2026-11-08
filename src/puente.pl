@@ -25,16 +25,18 @@
             publicar/2,
             actualizar_libreta/2,
             poner_retardo/1,
-            web_preguntar_accion/5,
-            web_preguntar_carta/4,
-            web_observar/4,
+            web_preguntar_accion/6,
+            web_preguntar_carta/5,
+            web_observar/5,
             estados_de_la_libreta/2
           ]).
 
 :- use_module(library(lists)).
+:- use_module(library(apply)).
+:- use_module(library(random)).
 :- use_module(juego, [carta/2]).
 :- use_module(deduccion).
-:- use_module(ia, [media_observar/3]).
+:- use_module(ia, [media_observar/3, media_accion/2]).
 
 :- dynamic foto_/3, cola_/2, retardo_/1.
 
@@ -119,12 +121,20 @@ esperar(Id, Mensaje) :-
     ;   Mensaje = Mensaje0
     ).
 
-%!  web_preguntar_accion(+Id, +Yo, +Asistente, +Vista, -Accion) is det.
+%!  web_preguntar_accion(+Id, +Yo, +Asistente, +Modo, +Vista, -Accion) is det.
 %
 %   Le toca jugar al jugador web. Deja el estado a la vista, avisa de que
 %   se espera una acción y espera un mensaje accion(Tipo, [S, A, L]).
 
-web_preguntar_accion(Id, Yo, Asistente, Vista, Accion) :-
+web_preguntar_accion(Id, Yo, Asistente, espectar, Vista, Accion) :-
+    !,
+    % Modo demo: la IA media juega con este conocimiento y la libreta la muestra.
+    Vista = vista(Mano, _, _),
+    calcular_porcentajes(Id, Asistente),
+    publicar(Id, _{turno: Yo, mano: Mano}),
+    media_accion(Asistente, Accion),
+    pausar_un_poco.
+web_preguntar_accion(Id, Yo, Asistente, jugar, Vista, Accion) :-
     Vista = vista(Mano, _, _),
     calcular_porcentajes(Id, Asistente),
     publicar(Id, _{estado: esperando, turno: Yo, mano: Mano,
@@ -140,13 +150,15 @@ espera_accion(Id, Accion) :-
     ;   espera_accion(Id, Accion)
     ).
 
-%!  web_preguntar_carta(+Id, +Sugerencia, +Candidatas, -Carta) is det.
+%!  web_preguntar_carta(+Id, +Modo, +Sugerencia, +Candidatas, -Carta) is det.
 %
 %   Al jugador web le toca refutar. Si solo tiene una carta no hay nada
 %   que elegir; si tiene varias, espera un mensaje carta(Carta).
 
-web_preguntar_carta(_, _, [Unica], Unica) :- !.
-web_preguntar_carta(Id, sugerencia(Quien, Cartas), Candidatas, Carta) :-
+web_preguntar_carta(_, _, _, [Unica], Unica) :- !.
+web_preguntar_carta(_, espectar, _, Candidatas, Carta) :- !,
+    random_member(Carta, Candidatas).
+web_preguntar_carta(Id, jugar, sugerencia(Quien, Cartas), Candidatas, Carta) :-
     publicar(Id, _{estado: esperando,
                    pendiente: _{tipo: carta,
                                 sugerencia: _{quien: Quien, cartas: Cartas},
@@ -165,13 +177,13 @@ espera_carta(Id, Candidatas, Carta) :-
 %   ---------------------------------------------------------------------
 %   Lo que ve el jugador web
 
-%!  web_observar(+Id, +Yo, +Asistente, +Evento) is det.
+%!  web_observar(+Id, +Yo, +Asistente, +Modo, +Evento) is det.
 %
 %   El jugador web ve un Evento del protocolo: lo anota en el historial,
 %   se lo cuenta a su asistente (si lo tiene) y hace una pausa si lo ha
 %   hecho otro jugador.
 
-web_observar(Id, Yo, Asistente, Evento) :-
+web_observar(Id, Yo, Asistente, _Modo, Evento) :-
     actualizar(Id, cambios_por_evento(Evento)),
     observar_con_asistente(Id, Yo, Asistente, Evento),
     pausa(Yo, Evento).
@@ -235,6 +247,10 @@ siguiente_turno(Jugadores, Quien, Turno) :-
     ->  true
     ;   Turno = Quien
     ).
+
+pausar_un_poco :-
+    retardo_(Segundos),
+    (   Segundos > 0 -> sleep(Segundos) ; true ).
 
 pausa(Yo, Evento) :-
     retardo_(Segundos),

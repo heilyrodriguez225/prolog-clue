@@ -27,6 +27,7 @@
           ]).
 
 :- use_module(library(lists)).
+:- use_module(library(apply)).
 :- use_module(library(readutil)).
 :- use_module(juego, [carta/2, nombre/2]).
 

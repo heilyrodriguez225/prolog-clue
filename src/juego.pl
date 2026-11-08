@@ -11,6 +11,7 @@
 
 :- use_module(library(random)).
 :- use_module(library(lists)).
+:- use_module(library(apply)).
 
 %!  carta(?Tipo, ?Carta) is nondet.
 %

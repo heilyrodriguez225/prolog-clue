@@ -200,7 +200,7 @@ La página y el juego hablan por HTTP con mensajes JSON. Esto es el **diseño**;
 | Ruta | Para qué |
 |---|---|
 | `GET /api/config` | Lo que la página necesita saber antes de empezar, para no repetirlo en JavaScript: las 21 cartas (`id`, `nombre`, `tipo`), los niveles que existen y los límites de rivales (2 a 4). La imagen de cada carta es `img/cartas/{id}.png` |
-| `POST /api/partida` | Crear una partida. Cuerpo: `{"nombre": "Ana", "rivales": [{"nivel": "facil"}, {"nivel": "media"}], "asistente": true}`. De 2 a 4 rivales, **cada uno con su nivel**. Devuelve el estado con el `id` de la partida |
+| `POST /api/partida` | Crear una partida. Cuerpo: `{"nombre": "Ana", "rivales": [{"nivel": "facil"}, {"nivel": "media"}], "asistente": true, "modo": "jugar"}`. Con `"modo": "espectador"` (demo) juega la IA media en tu lugar y la libreta es la suya; necesita `asistente`. De 2 a 4 rivales, **cada uno con su nivel**. Devuelve el estado con el `id` de la partida |
 | `GET /api/partida/{id}` | El estado actual. Con `?version=N` y sin cambios desde entonces, devuelve solo `{"version": N, "sin_cambios": true}` |
 | `POST /api/partida/{id}/accion` | Hacer tu jugada: `{"tipo": "sugerir", "cartas": ["chef_canela", "trofeo", "biblioteca"]}` o `{"tipo": "acusar", ...}` |
 | `POST /api/partida/{id}/carta` | Elegir qué carta enseñar al refutar: `{"carta": "trofeo"}` |
@@ -242,6 +242,7 @@ Los `POST` devuelven el estado enseguida; **la página consulta `GET` cada poco*
 
 | Campo | Valores |
 |---|---|
+| `modo` | `jugar` o `espectar` (demo: la IA juega por el jugador 1) |
 | `estado` | `jugando` (juega una IA), `esperando` (te toca: mira `pendiente`) o `fin` |
 | `pendiente` | `null`; `{"tipo": "accion"}` (sugerir o acusar); o `{"tipo": "carta", "sugerencia": {"quien": 2, "cartas": [...]}, "candidatas": [...]}` (tienes que refutar) |
 | `historial[].carta_vista` | Solo en tus sugerencias, y solo si alguien refutó: `{"jugador": 3, "carta": "daga"}`. En las de los demás, siempre `null` |

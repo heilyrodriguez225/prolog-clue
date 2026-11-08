@@ -10,8 +10,8 @@
       depende del tipo:
 
           azar, humano    []
-          web             web(Id, Asistente)   la partida y su asistente,
-                                               o none si no tiene
+          web             web(Id, Asistente, Modo)   la partida, su asistente (o none)
+                                               y el modo: jugar o espectar
           facil           vistas(Cartas)   las cartas que ha visto
           media, dificil  mente(K, Mostradas)
                             K          el conocimiento de deduccion.pl,
@@ -40,6 +40,7 @@
 
 :- use_module(library(error)).
 :- use_module(library(lists)).
+:- use_module(library(apply)).
 :- use_module(library(random)).
 :- use_module(deduccion).
 :- use_module(ia).
@@ -70,7 +71,7 @@ nuevo_jugador(Id, Tipo, Partida, jugador(Id, Tipo, Memoria)) :-
 memoria_inicial(humano, _, _, []).
 memoria_inicial(azar, _, _, []).
 % El jugador web recibe su memoria de verdad al crear la partida (servidor.pl).
-memoria_inicial(web, _, _, web(sin_partida, none)).
+memoria_inicial(web, _, _, web(sin_partida, none, jugar)).
 memoria_inicial(facil, Id, Partida, vistas(Mano)) :-
     mano_de(Id, Partida, Mano).
 memoria_inicial(media, Id, Partida, mente(K, [])) :-
@@ -179,8 +180,8 @@ observar(Jugador, Evento, Jugador1) :-
 
 elige_accion(azar,    J, _, Accion, J) :- accion_al_azar(Accion).
 elige_accion(web,     J, Vista, Accion, J) :-
-    J = jugador(Yo, web, web(Id, Asistente)),
-    web_preguntar_accion(Id, Yo, Asistente, Vista, Accion).
+    J = jugador(Yo, web, web(Id, Asistente, Modo)),
+    web_preguntar_accion(Id, Yo, Asistente, Modo, Vista, Accion).
 elige_accion(humano,  J, Vista, Accion, J) :-
     J = jugador(Id, humano, _),
     preguntar_accion(Id, Vista, Accion).
@@ -194,8 +195,8 @@ elige_accion(dificil, J, _, Accion, J) :- accion_al_azar(Accion).
 
 elige_carta(azar,    J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
 elige_carta(web,     J, Sugerencia, Candidatas, Carta, J) :-
-    J = jugador(_, web, web(Id, _)),
-    web_preguntar_carta(Id, Sugerencia, Candidatas, Carta).
+    J = jugador(_, web, web(Id, _, Modo)),
+    web_preguntar_carta(Id, Modo, Sugerencia, Candidatas, Carta).
 elige_carta(humano,  J, Sugerencia, Candidatas, Carta, J) :-
     preguntar_carta(Sugerencia, Candidatas, Carta).
 elige_carta(facil,   J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
@@ -206,8 +207,8 @@ elige_carta(dificil, J, _, Candidatas, Carta, J) :- random_member(Carta, Candida
 
 observa(azar,    J, _, J).
 observa(web, J, Evento, J) :-
-    J = jugador(Yo, web, web(Id, Asistente)),
-    web_observar(Id, Yo, Asistente, Evento).
+    J = jugador(Yo, web, web(Id, Asistente, Modo)),
+    web_observar(Id, Yo, Asistente, Modo, Evento).
 observa(humano, J, Evento, J) :-
     J = jugador(Id, humano, _),
     mostrar_evento(Id, Evento).

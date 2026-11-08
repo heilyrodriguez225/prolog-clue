@@ -33,6 +33,7 @@
 :- use_module(library(http/http_files)).
 :- use_module(library(http/http_parameters)).
 :- use_module(library(lists)).
+:- use_module(library(apply)).
 :- use_module(library(random)).
 :- use_module(library(error)).
 :- use_module(juego, [carta/2, nombre/2]).
@@ -85,11 +86,12 @@ api_crear(Entrada, Estado) :-
     rivales_de(Entrada, Niveles),
     nombre_de(Entrada, Nombre),
     asistente_de(Entrada, Asistente),
+    modo_de(Entrada, Asistente, Modo),
     limpiar_partidas,
     nuevo_id(Id),
     message_queue_create(Cola),
     registrar_partida(Id, Cola),
-    thread_create(correr(Id, Nombre, Niveles, Asistente), Hilo, [detached(true)]),
+    thread_create(correr(Id, Nombre, Niveles, Asistente, Modo), Hilo, [detached(true)]),
     get_time(Ahora),
     with_mutex(sherlog_servidor, assertz(partida_(Id, Hilo, Cola, Ahora))),
     esperar_primera_foto(Id, Estado).
@@ -132,6 +134,17 @@ asistente_de(Entrada, Asistente) :-
     (   get_dict(asistente, Entrada, false)
     ->  Asistente = false
     ;   Asistente = true
+    ).
+
+% "modo": "espectador" es para la demo: juega la IA media en tu lugar y
+% la libreta es la suya. Necesita el asistente (es lo que se enseña).
+modo_de(Entrada, Asistente, Modo) :-
+    (   get_dict(modo, Entrada, Texto), a_atomo(Texto, espectador)
+    ->  (   Asistente == true
+        ->  Modo = espectar
+        ;   api_error(modo_invalido, 400, "El modo espectador necesita la libreta activada.")
+        )
+    ;   Modo = jugar
     ).
 
 nuevo_id(Id) :-
@@ -314,25 +327,25 @@ limpiar_partidas :-
 %   ---------------------------------------------------------------------
 %   El hilo de una partida
 
-correr(Id, Nombre, Niveles, Asistente) :-
-    catch(partida_completa(Id, Nombre, Niveles, Asistente),
+correr(Id, Nombre, Niveles, Asistente, Modo) :-
+    catch(partida_completa(Id, Nombre, Niveles, Asistente, Modo),
           Error,
           terminar_con_error(Id, Error)).
 
-partida_completa(Id, Nombre, Niveles, Asistente) :-
+partida_completa(Id, Nombre, Niveles, Asistente, Modo) :-
     iniciar_partida([web|Niveles], Partida, Jugadores0),
     (   Asistente == true
     ->  conocimiento_inicial(1, Partida, K)
     ;   K = none
     ),
     jugador_con_id(1, Jugadores0, Humano0),
-    con_memoria(Humano0, web(Id, K), Humano),
+    con_memoria(Humano0, web(Id, K, Modo), Humano),
     reemplazar_jugador(Jugadores0, Humano, Jugadores),
-    foto_inicial(Id, Nombre, Niveles, Partida, K),
+    foto_inicial(Id, Nombre, Niveles, Partida, K, Modo),
     jugar(Partida, Jugadores, [termina_si_cae(1)], Resultado),
     publicar_fin(Id, Resultado).
 
-foto_inicial(Id, Nombre, Niveles, Partida, K) :-
+foto_inicial(Id, Nombre, Niveles, Partida, K, Modo) :-
     Partida = partida(_, Manos, _, _, _),
     memberchk(1-Mano, Manos),
     cuentas(Partida, Cuentas),
@@ -349,7 +362,7 @@ foto_inicial(Id, Nombre, Niveles, Partida, K) :-
     ->  Libreta = null
     ;   estados_de_la_libreta(K, Libreta)
     ),
-    publicar(Id, _{estado: jugando, turno: 1, jugadores: [Humano|IAs], mano: Mano,
+    publicar(Id, _{estado: jugando, modo: Modo, turno: 1, jugadores: [Humano|IAs], mano: Mano,
                    historial: [], pendiente: null, libreta: Libreta, fin: null}).
 
 publicar_fin(Id, fin(Ganador, Motivo, Partida, _)) :-

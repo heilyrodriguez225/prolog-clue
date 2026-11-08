@@ -94,7 +94,8 @@ function pintarEncabezado() {
   document.getElementById('pildora-turno-nombre').textContent = texto;
   const aviso = document.getElementById('aviso-turno');
   const tuTurno = estado.estado === 'esperando';
-  aviso.textContent = tuTurno ? 'Es tu turno: sugiere o acusa.' : estado.estado === 'fin' ? '' : 'Esperando a los demás…';
+  aviso.textContent = estado.modo === 'espectar' && estado.estado !== 'fin' ? 'Modo demo: observas pensar a la IA.'
+    : tuTurno ? 'Es tu turno: sugiere o acusa.' : estado.estado === 'fin' ? '' : 'Esperando a los demás…';
   aviso.classList.toggle('tu-turno', tuTurno);
 }
 
@@ -140,10 +141,23 @@ function pintarHistorial() {
 
 // ---------- Libreta (la asistida completa es la #20) ----------
 
-function claseLibreta(entrada) {
-  if (entrada.estado === 'descartada') return 'descartado';
-  if (entrada.estado === 'sobre') return 'sobre';
-  return 'sinpista';
+// Estados de la libreta: descartado (no está en el sobre), segura (seguro: está en el sobre),
+// sospechoso (más probable que la media de su tipo) y sinpista.
+function estadosDeLibreta() {
+  const libreta = estado.libreta;
+  const res = {};
+  for (const c of CARTAS) {
+    const e = libreta && libreta.find((l) => l.carta === c.id);
+    if (e) res[c.id] = { clase: e.estado === 'descartada' ? 'descartado' : e.estado === 'sobre' ? 'segura' : 'sinpista', pct: e.probabilidad };
+    else res[c.id] = { clase: estado.mano.includes(c.id) ? 'descartado' : 'sinpista', pct: null }; // sin asistente solo sabes tu mano
+  }
+  // Más probable que la media de su tipo (la media es 100 / cartas que quedan) = sospechoso.
+  for (const tipo of Object.keys(TIPOS)) {
+    const vivas = CARTAS.filter((c) => c.tipo === tipo && res[c.id].clase === 'sinpista' && res[c.id].pct !== null);
+    const media = vivas.length ? vivas.reduce((t, c) => t + res[c.id].pct, 0) / vivas.length : 0;
+    for (const c of vivas) if (res[c.id].pct > media + 0.5) res[c.id].clase = 'sospechoso';
+  }
+  return res;
 }
 
 function pintarLibreta() {
@@ -152,17 +166,21 @@ function pintarLibreta() {
   document.getElementById('libreta-cab-titulo').textContent = TIPOS_PL[tipoLibreta];
   const delTipo = CARTAS.filter((c) => c.tipo === tipoLibreta);
   document.getElementById('libreta-cab-total').textContent = `${delTipo.length} posibles`;
-  const libreta = estado.libreta;
+  const estados = estadosDeLibreta();
+  const sinAsistente = !estado.libreta;
   for (const c of delTipo) {
-    const entrada = libreta && libreta.find((l) => l.carta === c.id);
-    const clase = entrada ? claseLibreta(entrada) : 'sinpista';
-    const icono = clase === 'descartado' ? '☒' : clase === 'sobre' ? '？' : '';
-    lista.append(el('div', `fila-carta ${clase}`, `<span class="estado-ico">${icono}</span><span class="nombre">${esc(c.nombre)}</span>`));
+    const { clase, pct } = estados[c.id];
+    const icono = clase === 'descartado' ? '☒' : clase === 'segura' ? '✔' : clase === 'sospechoso' ? '？' : '';
+    const porcentaje = clase === 'descartado' || pct === null ? '' : `${pct.toFixed(0)} %`;
+    lista.append(el('div', `fila-carta ${clase}`, `<span class="estado-ico">${icono}</span><span class="nombre">${esc(c.nombre)}</span><span class="pct">${porcentaje}</span>`));
   }
+  if (sinAsistente) lista.append(el('p', 'nota-asistente', 'Asistente apagado: la libreta solo marca tus cartas. Deduce tú.'));
   const total = CARTAS.length - 3;
-  const descartadas = libreta ? libreta.filter((l) => l.estado === 'descartada').length : 0;
+  const descartadas = Object.values(estados).filter((e) => e.clase === 'descartado').length;
   document.getElementById('progreso-txt').textContent = `${descartadas} de ${total} descartadas`;
   document.getElementById('progreso-rel').style.width = `${Math.min(100, (descartadas / total) * 100)}%`;
+  const espectar = estado.modo === 'espectar';
+  document.getElementById('libreta-titulo').textContent = espectar ? 'IA (jugador 1)' : 'Detective';
 }
 
 // ---------- Acciones ----------
@@ -260,7 +278,10 @@ function pintarFin() {
   clavePendiente = 'fin';
   const f = estado.fin;
   let titulo, motivo;
-  if (f.ganador === 1) {
+  if (estado.modo === 'espectar') {
+    titulo = f.ganador === 1 ? 'La IA ha ganado' : f.ganador === null ? 'La IA se ha equivocado' : `Gana ${nombreJugador(f.ganador)}`;
+    motivo = f.ganador === 1 ? 'Acusó con la solución deducida: mira su libreta.' : 'La partida termina aquí.';
+  } else if (f.ganador === 1) {
     titulo = '¡Has ganado!';
     motivo = f.motivo === 'acierta' ? 'Acusaste correctamente.' : 'Eres el único que queda sin eliminar.';
   } else if (f.ganador === null) {
