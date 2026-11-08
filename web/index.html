@@ -15,7 +15,7 @@
       <span class="lema">Deducción entre detectives</span>
     </span>
   </a>
-  <span class="turno">Turno: <strong id="turno-nombre">Tú</strong></span>
+  <span class="turno">Turno: <strong id="turno-nombre">…</strong></span>
 </header>
 
 <main class="juego">
@@ -94,13 +94,16 @@
     <div class="panel-sugerencia" id="panel-sugerencia" hidden>
       <div class="selectores" id="selectores"></div>
       <div class="botones">
-        <button class="primario">Sugerir</button>
+        <button class="primario" id="enviar-sugerencia">Sugerir</button>
+        <button type="button" id="enviar-acusacion">Acusar</button>
       </div>
     </div>
 
-    <button type="button" class="boton-acusar">✉ Formular acusación</button>
+    <p class="aviso-turno" id="aviso-turno"></p>
   </aside>
 </main>
+
+<dialog id="dialogo"></dialog>
 
 <script src="app.js"></script>
 </body>

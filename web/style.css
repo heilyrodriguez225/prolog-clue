@@ -436,3 +436,17 @@ body.inicio { height: auto; min-height: 100vh; }
   .escena { grid-template-columns: 1fr; padding: 32px; }
   .pie-pagina { flex-direction: column; gap: 6px; text-align: center; }
 }
+
+/* --- Comportamiento (#19): diálogo, avisos y botones desactivados --- */
+dialog#dialogo {
+  border: 1px solid var(--panel-borde); border-radius: 10px; background: var(--panel);
+  color: var(--tinta, #2b2430); padding: 22px 26px; max-width: 460px; width: calc(100% - 32px);
+}
+dialog#dialogo::backdrop { background: rgba(10, 8, 16, .7); }
+dialog#dialogo h2 { margin: 0 0 8px; }
+dialog#dialogo .opciones { display: flex; flex-direction: column; gap: 8px; margin: 14px 0 4px; }
+dialog#dialogo .botones { display: flex; gap: 10px; margin-top: 14px; }
+.aviso-turno { font-size: 13px; color: var(--suave); margin: 10px 0 0; min-height: 1.2em; }
+.aviso-turno.tu-turno { color: var(--vino); font-weight: 600; }
+button:disabled, select:disabled { opacity: .5; cursor: not-allowed; }
+.fila-carta.sobre .estado-ico { color: var(--dorado); border-color: var(--dorado); }

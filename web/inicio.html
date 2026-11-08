@@ -91,7 +91,7 @@
       <div class="ayuda">👁 Un desafío equilibrado</div>
     </div>
 
-    <a class="cta" href="index.html">
+    <a class="cta" href="index.html" id="entrar">
       <span>
         <span class="etq">La partida está lista</span>
         <span class="txt">Entrar a la mansión</span>
@@ -125,6 +125,28 @@
   }
   exclusivo('rivales', '.op-rival');
   exclusivo('dificultad', '.op-dificultad');
+
+  // La dificultad de la maqueta es una sola para todos; la elección por rival es la #22.
+  const NIVELES = { facil: 'facil', medio: 'media', dificil: 'dificil' };
+
+  document.getElementById('entrar').addEventListener('click', async (ev) => {
+    ev.preventDefault();
+    const cuantos = Number(document.querySelector('#rivales .sel').dataset.valor);
+    const nivel = NIVELES[document.querySelector('#dificultad .sel').dataset.valor];
+    // La IA difícil aún no existe (#21): se juega con la media.
+    const real = nivel === 'dificil' ? 'media' : nivel;
+    const cuerpo = { nombre: nombre.value, rivales: Array.from({ length: cuantos }, () => ({ nivel: real })) };
+    try {
+      const r = await fetch('/api/partida', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo),
+      });
+      const datos = await r.json();
+      if (!r.ok) throw new Error(datos.mensaje || 'Error');
+      location.href = `index.html#${datos.id}`;
+    } catch (e) {
+      alert('No se pudo crear la partida: ' + e.message);
+    }
+  });
 </script>
 </body>
 </html>
