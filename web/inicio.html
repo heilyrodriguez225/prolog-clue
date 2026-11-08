@@ -143,8 +143,7 @@
     ev.preventDefault();
     const cuantos = Number(document.querySelector('#rivales .sel').dataset.valor);
     const nivel = NIVELES[document.querySelector('#dificultad .sel').dataset.valor];
-    // La IA difícil aún no existe (#21): se juega con la media.
-    const real = nivel === 'dificil' ? 'media' : nivel;
+    const real = nivel;
     const espectador = document.getElementById('espectador').checked;
     const cuerpo = { nombre: nombre.value, asistente: espectador || document.getElementById('asistente').checked, modo: espectador ? 'espectador' : 'jugar', rivales: Array.from({ length: cuantos }, () => ({ nivel: real })) };
     try {

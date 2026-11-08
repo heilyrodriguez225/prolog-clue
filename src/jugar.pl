@@ -5,7 +5,7 @@
         swipl src/jugar.pl                    3 IAs: una media y dos fáciles
         swipl src/jugar.pl media media facil  las IAs que quieras, de 2 a 4
 
-    Los niveles de IA son: azar, facil y media.
+    Los niveles de IA son: azar, facil, media y dificil.
 
     Tú eres el jugador 1. Escribe el número de la opción que quieras.
     Con Ctrl-D abandonas la partida.

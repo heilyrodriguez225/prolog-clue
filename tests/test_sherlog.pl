@@ -23,7 +23,7 @@ aparece(Texto, Trozo) :- sub_string(Texto, _, _, _, Trozo), !.
 
 :- begin_tests(rivales).
 
-test(los_niveles_son_azar_facil_y_media, [true(N == [azar, facil, media])]) :- niveles(N).
+test(los_niveles_son_azar_facil_media_y_dificil, [true(N == [azar, facil, media, dificil])]) :- niveles(N).
 test(por_defecto_una_media_y_dos_faciles, [true(R == [media, facil, facil])]) :- rivales_por_defecto(R).
 
 test(de_2_a_4_rivales_valen, [forall(member(R, [[facil, facil], [media, azar, facil], [media, media, media, media]]))]) :-
@@ -39,7 +39,7 @@ test(el_humano_no_es_un_rival, [fail]) :- rivales_validos([facil, humano]).
 
 :- begin_tests(partida_por_la_terminal).
 
-test(una_partida_completa_acaba_con_un_ganador, [forall(member(Rivales, [[facil, facil], [media, facil, azar], [azar, azar, media, facil]]))]) :-
+test(una_partida_completa_acaba_con_un_ganador, [forall(member(Rivales, [[facil, facil], [media, facil, azar], [azar, azar, media, facil], [dificil, azar]]))]) :-
     set_random(seed(3)),
     con_unos("", Entrada),
     jugar_con_entrada(Entrada, Rivales, Salida),

@@ -25,6 +25,8 @@
             probabilidades/2,
             probabilidades/3,
             probabilidades_exactas/2,
+            muestrear/3,
+            mundos_posibles/4,
             solucion_segura/2
           ]).
 
@@ -271,7 +273,17 @@ frecuencias(Mundos, Probs) :-
 %   unificando las variables con él. Como la propuesta es simétrica y
 %   solo se rechazan mundos imposibles, a la larga todos los mundos
 %   posibles son igual de probables.
-muestrear(conocimiento(_, P), N, Mundos) :-
+muestrear(K, N, Sobres) :-
+    muestrear_duenos(K, N, Mundos),
+    K = conocimiento(_, P),
+    pairs_keys(P, Cartas),
+    maplist(sobre_de_mundo(Cartas), Mundos, Sobres).
+
+%!  muestrear_duenos(+K, +N, -Mundos) is semidet.
+%
+%   Como muestrear/3, pero cada mundo es la lista completa de dueños de
+%   las 21 cartas, en el orden de K (0 es el sobre, 1..N los jugadores).
+muestrear_duenos(conocimiento(_, P), N, Mundos) :-
     pairs_values(P, Ds),
     pairs_keys(P, Cartas),
     maplist(tipo_de_carta, Cartas, Tipos),
@@ -281,18 +293,39 @@ muestrear(conocimiento(_, P), N, Mundos) :-
             [Mundo0]),
     pasos_de_calentamiento(Calentamiento),
     avanzar(Calentamiento, Ds, Tipos, Mundo0, Mundo1),
-    recoger(N, Ds, Tipos, P, Mundo1, Mundos).
+    recoger(N, Ds, Tipos, Mundo1, Mundos).
+
+sobre_de_mundo(Cartas, Mundo, Sobre) :-
+    findall(C, (nth1(I, Mundo, 0), nth1(I, Cartas, C)), Sobre).
+
+%!  mundos_posibles(+K, +N, -Cartas, -Mundos) is semidet.
+%
+%   Mundos posibles según K, cada uno la lista de dueños alineada con
+%   Cartas (las 21 cartas, en orden). Si quedan 500 o menos son todos los
+%   que hay (exacto); si no, N mundos muestreados. Falla si K es
+%   contradictorio.
+mundos_posibles(K, N, Cartas, Mundos) :-
+    K = conocimiento(_, P),
+    pairs_keys(P, Cartas),
+    limite_exacto(Limite),
+    Maximo is Limite + 1,
+    pairs_values(P, Ds),
+    findall(Ds, limit(Maximo, (label(Ds))), Todos),
+    length(Todos, Cuantos),
+    (   Cuantos =< Limite
+    ->  Mundos = Todos
+    ;   muestrear_duenos(K, N, Mundos)
+    ),
+    Mundos = [_|_].
 
 tipo_de_carta(Carta, Tipo) :- once(carta(Tipo, Carta)).
 
-recoger(0, _, _, _, _, []) :- !.
-recoger(N, Ds, Tipos, P, Mundo0, [Sobre|Sobres]) :-
+recoger(0, _, _, _, []) :- !.
+recoger(N, Ds, Tipos, Mundo0, [Mundo|Mundos]) :-
     pasos_entre_muestras(Pasos),
     avanzar(Pasos, Ds, Tipos, Mundo0, Mundo),
-    pairs_keys(P, Cartas),
-    findall(C, (nth1(I, Mundo, 0), nth1(I, Cartas, C)), Sobre),
     N1 is N - 1,
-    recoger(N1, Ds, Tipos, P, Mundo, Sobres).
+    recoger(N1, Ds, Tipos, Mundo, Mundos).
 
 % Da Pasos pasos de la cadena, partiendo del mundo Mundo0.
 avanzar(0, _, _, Mundo, Mundo) :- !.

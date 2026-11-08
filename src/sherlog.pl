@@ -22,7 +22,7 @@
 %
 %   Los tipos de IA que se pueden elegir como rivales.
 
-niveles([azar, facil, media]).
+niveles([azar, facil, media, dificil]).
 
 %!  rivales_por_defecto(-Rivales) is det.
 

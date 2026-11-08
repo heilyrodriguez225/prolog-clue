@@ -84,10 +84,10 @@ test(reemplazar_es_determinista) :-
 % baratos; la IA media, que deduce con restricciones y es la más lenta, se prueba
 % en menos partidas (ver más abajo).
 tipos_variados(N, Tipos) :-
-    tipos_de(N, [azar, facil, dificil, azar], Tipos).
+    tipos_de(N, [azar, facil, facil, azar], Tipos).
 
 tipos_con_media(N, Tipos) :-
-    tipos_de(N, [media, facil, azar, dificil], Tipos).
+    tipos_de(N, [media, facil, azar, azar], Tipos).
 
 tipos_de(N, Todos, Tipos) :-
     numlist(1, N, Numeros),
@@ -136,10 +136,15 @@ test(una_accion_incompleta_no_vale, [fail]) :-
 
 :- begin_tests(un_turno).
 
+% La IA difícil piensa con muestras (medio segundo por decisión): menos repeticiones.
+veces(dificil, 2) :- !.
+veces(_, 15).
+
 test(da_una_accion_valida_para_cada_tipo, [forall(member(Tipo, [facil, media, dificil, azar]))]) :-
     partida_en_turno(1, [], P),
     jugadores_iniciales(P, [Tipo, facil, facil, facil], Js),
-    forall(between(1, 15, _),
+    veces(Tipo, Veces),
+    forall(between(1, Veces, _),
            ( accion_del_turno(P, Js, Accion, _),
              accion_valida(Accion) )).
 
@@ -919,3 +924,33 @@ test(la_partida_nunca_sigue_despues_de_eliminar_al_jugador, [forall(member(N, [3
     Cayeron >= 5.                          % que la comprobación no sea vacía
 
 :- end_tests(termina_si_cae).
+
+:- begin_tests(ia_dificil_en_partidas).
+
+% La IA difícil piensa con muestras, así que aquí se juegan pocas partidas;
+% la comparación con la media está en tests/dificil_vs_media.pl.
+
+test(la_ia_dificil_nunca_es_eliminada, [forall(member(Rivales, [[azar, azar], [media, facil, azar]]))]) :-
+    % Contra jugadores al azar, que sí se equivocan al acusar: ella nunca.
+    set_random(seed(11)),
+    forall(between(1, 3, _),
+           ( iniciar_partida([dificil|Rivales], P, Js),
+             jugar(P, Js, fin(_, _, partida(_, _, _, Eliminados, _), _)),
+             \+ memberchk(1, Eliminados) )).
+
+test(la_ia_dificil_gana_a_los_jugadores_al_azar) :-
+    set_random(seed(12)),
+    findall(G, ( between(1, 6, _),
+                 iniciar_partida([dificil, azar, azar, azar], P, Js),
+                 jugar(P, Js, fin(G, _, _, _)) ),
+            Ganadores),
+    aggregate_all(count, member(1, Ganadores), V),
+    V >= 5.
+
+test(el_historial_de_una_partida_con_dificil_solo_tiene_eventos_publicos) :-
+    set_random(seed(13)),
+    iniciar_partida([dificil, media, facil], P, Js),
+    jugar(P, Js, fin(_, _, partida(_, _, _, _, H), _)),
+    forall(member(E, H), evento_publico(E)).
+
+:- end_tests(ia_dificil_en_partidas).

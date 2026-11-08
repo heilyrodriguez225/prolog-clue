@@ -477,3 +477,138 @@ test(es_determinista_al_repetir) :-
     media_carta_a_mostrar([3-trofeo], 3, [trofeo, comedor], _, _).
 
 :- end_tests(media_carta_a_mostrar).
+
+:- begin_tests(entropia_esperada).
+
+% Tres cartas de mentira y mundos escritos a mano: [dueño de a, de b, de c]
+% (0 es el sobre, 1 es quien pregunta, 2 y 3 los demás) y el sobre de cada
+% mundo, que aquí es solo una etiqueta: [sospechoso, arma, lugar].
+mundo_de_prueba(Duenos, Sobre, mundo(Duenos, Sobre)).
+
+% Dos mundos que solo se distinguen por quién tiene la carta a: en uno la
+% tiene el jugador 2 y en el otro el 3. El sobre es distinto en cada uno.
+dos_mundos([mundo([2, 1, 1], [s1, a1, l1]), mundo([3, 1, 1], [s2, a1, l1])]).
+
+test(una_pregunta_que_separa_los_mundos_no_deja_incertidumbre, [true(P =:= 0.0)]) :-
+    dos_mundos(Datos),
+    % pregunta por a: refuta el 2 en un mundo y el 3 en el otro
+    entropia_esperada(sugerencia(a, b, c), [a, b, c], [2, 3], Datos, P).
+
+test(una_pregunta_que_no_separa_deja_toda_la_incertidumbre, [true(P =:= 1.0)]) :-
+    dos_mundos(Datos),
+    % pregunta por b y c, que tiene quien pregunta: nadie refuta en los dos mundos
+    entropia_esperada(sugerencia(b, b, c), [a, b, c], [2, 3], Datos, P).
+
+test(separar_es_mejor_que_no_separar) :-
+    dos_mundos(Datos),
+    entropia_esperada(sugerencia(a, b, c), [a, b, c], [2, 3], Datos, Separa),
+    entropia_esperada(sugerencia(b, b, c), [a, b, c], [2, 3], Datos, NoSepara),
+    Separa < NoSepara.
+
+test(nunca_es_negativa_ni_mayor_que_la_inicial) :-
+    dos_mundos(Datos),
+    forall(member(S, [sugerencia(a, b, c), sugerencia(b, b, c), sugerencia(a, a, c)]),
+           ( entropia_esperada(S, [a, b, c], [2, 3], Datos, P),
+             P >= 0.0, P =< 1.0 + 1.0e-9 )).
+
+test(con_un_solo_tenedor_el_orden_de_consulta_da_igual) :-
+    % solo un jugador tiene la carta a en cada mundo
+    Datos = [mundo([2, 1, 1], [s1, a1, l1]), mundo([3, 1, 1], [s2, a1, l1]),
+             mundo([2, 1, 1], [s3, a1, l1]), mundo([3, 1, 1], [s4, a1, l1])],
+    entropia_esperada(sugerencia(a, b, c), [a, b, c], [2, 3], Datos, P1),
+    entropia_esperada(sugerencia(a, b, c), [a, b, c], [3, 2], Datos, P2),
+    abs(P1 - P2) < 1.0e-9.
+
+test(si_refuta_con_dos_cartas_ensenar_una_u_otra_no_distingue_mundos, [true(P =:= 1.0)]) :-
+    % el jugador 2 tiene a y b en los dos mundos: enseñe la que enseñe,
+    % los dos mundos (sobres distintos) siguen siendo posibles
+    Datos = [mundo([2, 2, 1], [s1, a1, l1]), mundo([2, 2, 1], [s2, a1, l1])],
+    entropia_esperada(sugerencia(a, b, c), [a, b, c], [2, 3], Datos, P).
+
+:- end_tests(entropia_esperada).
+
+:- begin_tests(dificil_accion).
+
+con_el_sobre_casi_deducido(K) :-
+    % Sabe el sospechoso y el arma. Del lugar solo quedan dos posibles:
+    % sala_de_video y gimnasio (ha visto cuatro y tiene tres).
+    conocimiento_de_la_demo(K),
+    media_observar(1, sugerencia(1, [senora_coral, cuerda, biblioteca],
+                                 [no_pudo(2), no_pudo(3), no_pudo(4)]), K),
+    media_observar(1, carta_vista(2, comedor), K),
+    media_observar(1, carta_vista(3, estudio), K),
+    media_observar(1, carta_vista(4, bodega), K),
+    media_observar(1, carta_vista(2, jardin), K).
+
+test(sin_saber_nada_sugiere) :-
+    conocimiento_de_la_demo(K),
+    dificil_accion(K, Accion),
+    functor(Accion, sugerir, 3).
+
+test(acusa_cuando_el_sobre_esta_deducido, [true(Accion == acusar(senora_coral, cuerda, gimnasio))]) :-
+    con_el_sobre_deducido_dificil(K),
+    dificil_accion(K, Accion).
+
+con_el_sobre_deducido_dificil(K) :-
+    conocimiento_de_la_demo(K),
+    media_observar(1, sugerencia(1, [senora_coral, cuerda, biblioteca],
+                                 [no_pudo(2), no_pudo(3), no_pudo(4)]), K),
+    media_observar(1, sugerencia(1, [chef_canela, daga, gimnasio],
+                                 [no_pudo(2), no_pudo(3), no_pudo(4)]), K).
+
+test(acusa_si_y_solo_si_la_solucion_es_segura) :-
+    forall(member(Preparar, [conocimiento_de_la_demo, con_el_sobre_casi_deducido,
+                             con_el_sobre_deducido_dificil]),
+           (   call(Preparar, K),
+               (   solucion_segura(K, _) -> Segura = si ; Segura = no ),
+               dificil_accion(K, A),
+               (   functor(A, acusar, 3) -> Acusa = si ; Acusa = no ),
+               Segura == Acusa )).
+
+test(la_acusacion_coincide_con_solucion_segura) :-
+    con_el_sobre_deducido_dificil(K),
+    dificil_accion(K, acusar(S, A, L)),
+    solucion_segura(K, sobre(S, A, L)).
+
+test(una_sugerencia_tiene_una_carta_de_cada_tipo) :-
+    conocimiento_de_la_demo(K),
+    forall(between(1, 4, _),
+           ( dificil_accion(K, sugerir(S, A, L)),
+             carta(sospechoso, S), carta(arma, A), carta(lugar, L) )).
+
+test(no_sugiere_cartas_que_sabe_que_tienen_otros) :-
+    conocimiento_de_la_demo(K),
+    media_observar(1, carta_vista(2, trofeo), K),
+    media_observar(1, carta_vista(3, veneno), K),
+    forall(between(1, 4, _),
+           ( dificil_accion(K, sugerir(S, A, L)),
+             \+ memberchk(trofeo, [S, A, L]),
+             \+ memberchk(veneno, [S, A, L]) )).
+
+test(pregunta_por_una_de_las_dos_cartas_que_quedan) :-
+    % Con dos lugares posibles, preguntar por cualquier otro no enseña nada:
+    % tiene que incluir sala_de_video o gimnasio.
+    con_el_sobre_casi_deducido(K),
+    posibles_de_tipo(K, lugar, Lugares),
+    msort(Lugares, [gimnasio, sala_de_video]),
+    forall(between(1, 5, _),
+           ( dificil_accion(K, sugerir(_, _, L)),
+             memberchk(L, [gimnasio, sala_de_video]) )).
+
+test(no_deja_puntos_de_eleccion) :-
+    con_el_sobre_deducido_dificil(K),
+    dificil_accion(K, _).
+
+test(decide_en_menos_de_dos_segundos) :-
+    conocimiento_de_la_demo(K),
+    get_time(T0),
+    dificil_accion(K, _),
+    get_time(T1),
+    T1 - T0 < 2.0.
+
+test(las_opciones_se_respetan) :-
+    conocimiento_de_la_demo(K),
+    dificil_accion(K, [muestras(30), max_candidatas(5), con_mano(false)], A),
+    functor(A, sugerir, 3).
+
+:- end_tests(dificil_accion).

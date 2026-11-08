@@ -7,6 +7,10 @@
     IA fácil: su memoria son las cartas que ha visto (las suyas y las que
     le han enseñado). Sabe que ninguna de ellas está en el sobre.
 
+    IA difícil: sabe lo mismo que la media, pero en vez de preguntar al azar
+    entre las cartas posibles pregunta lo que más reduce su incertidumbre
+    sobre el sobre (ganancia de información, ver dificil_accion/3).
+
     IA media: su memoria es un conocimiento de deduccion.pl, con
     restricciones CLP(FD). Convierte en restricciones todo lo que ve en la
     mesa, también las sugerencias de los demás, y deduce qué cartas pueden
@@ -22,13 +26,19 @@
             facil_accion/2,
             media_observar/3,
             media_accion/2,
-            media_carta_a_mostrar/5
+            media_carta_a_mostrar/5,
+            dificil_accion/2,
+            dificil_accion/3,
+            entropia_esperada/5
           ]).
 
 :- use_module(library(lists)).
 :- use_module(library(apply)).
 :- use_module(library(random)).
 :- use_module(library(error)).
+:- use_module(library(pairs)).
+:- use_module(library(option)).
+:- use_module(library(clpfd), [fd_sup/2]).
 :- use_module(juego, [carta/2]).
 :- use_module(deduccion).
 
@@ -206,3 +216,153 @@ media_carta_a_mostrar(Mostradas, Quien, Candidatas, Carta, Mostradas1) :-
     ->  Mostradas1 = Mostradas
     ;   Mostradas1 = [Quien-Carta|Mostradas]
     ).
+
+%   ---------------------------------------------------------------------
+%   IA difícil
+
+%!  dificil_accion(+K, -Accion) is det.
+%!  dificil_accion(+K, +Opciones, -Accion) is det.
+%
+%   Accion es acusar(S, A, L) cuando la solución es segura (igual que la
+%   media: nunca acusa mal) y, si no, la sugerencia que más información
+%   promete.
+%
+%   Para decidir, mira mundos posibles (todos si quedan pocos; si no una
+%   muestra, ver mundos_posibles/4). Para cada sugerencia candidata y
+%   cada mundo calcula qué ocurriría: quién la refutaría y qué carta
+%   enseñaría. Agrupa los mundos por ese resultado y mide cuánta
+%   incertidumbre sobre el sobre queda en cada grupo (entropia_esperada/5).
+%   Elige la sugerencia con la incertidumbre esperada menor.
+%
+%   Opciones: muestras(N) mundos a muestrear (200), max_candidatas(N)
+%   sugerencias a evaluar como mucho (60) y con_mano(Bool) para incluir
+%   también cartas de su mano como candidatas (false).
+
+dificil_accion(K, Accion) :-
+    dificil_accion(K, [], Accion).
+
+dificil_accion(K, Opciones, Accion) :-
+    (   solucion_segura(K, sobre(S, A, L))
+    ->  Accion = acusar(S, A, L)
+    ;   catch(mejor_sugerencia(K, Opciones, Accion), error(_, _), fail)
+    ->  true
+    ;   media_accion(K, Accion)       % sin mundos que mirar: la media
+    ).
+
+mejor_sugerencia(K, Opciones, sugerir(S, A, L)) :-
+    option(muestras(Muestras), Opciones, 200),
+    option(max_candidatas(Max), Opciones, 150),
+    option(con_mano(ConMano), Opciones, true),
+    K = conocimiento(Yo, P),
+    candidatas(K, ConMano, Max, Candidatas),
+    mundos_posibles(K, Muestras, Cartas, Mundos),
+    numero_de_jugadores(P, N),
+    orden_de_consulta(Yo, N, Orden),
+    maplist(mundo_con_sobre(Cartas), Mundos, Datos),
+    findall(Puntos-Candidata,
+            ( member(Candidata, Candidatas),
+              entropia_esperada(Candidata, Cartas, Orden, Datos, Puntos) ),
+            Evaluadas),
+    keysort(Evaluadas, [_-sugerencia(S, A, L)|_]).
+
+% Las sugerencias que se evalúan: de cada tipo, las cartas que aún pueden
+% estar en el sobre (y, si se pide, las de su mano). Si salen demasiadas,
+% una muestra al azar: el orden aleatorio también desempata.
+candidatas(K, ConMano, Max, Candidatas) :-
+    K = conocimiento(Yo, P),
+    findall(T-Cs, ( member(T, [sospechoso, arma, lugar]),
+                    posibles_de_tipo(K, T, Posibles),
+                    cartas_a_probar(ConMano, Yo, P, T, Posibles, Cs) ),
+            [sospechoso-Ss, arma-As, lugar-Ls]),
+    findall(sugerencia(S, A, L), ( member(S, Ss), member(A, As), member(L, Ls) ), Todas),
+    random_permutation(Todas, Mezcladas),
+    length(Mezcladas, Cuantas),
+    (   Cuantas > Max
+    ->  length(Candidatas, Max), append(Candidatas, _, Mezcladas)
+    ;   Candidatas = Mezcladas
+    ).
+
+cartas_a_probar(false, _, _, _, Posibles, Posibles).
+cartas_a_probar(true, Yo, P, Tipo, Posibles, Cartas) :-
+    findall(C, ( carta(Tipo, C), memberchk(C-D, P), D == Yo ), Mias),
+    append(Posibles, Mias, Cartas0),
+    sort(Cartas0, Cartas).
+
+% Los jugadores son los números que pueden ser dueños de una carta: el
+% mayor es el último jugador.
+numero_de_jugadores(P, N) :-
+    pairs_values(P, Ds),
+    maplist(fd_sup, Ds, Sups),
+    max_list(Sups, N).
+
+% A quién se le pregunta, por orden: los demás jugadores a partir del siguiente.
+orden_de_consulta(Yo, N, Orden) :-
+    findall(J, ( between(1, N, Paso), J is (Yo - 1 + Paso) mod N + 1, J =\= Yo ), Orden).
+
+% Un mundo junto con las tres cartas que tiene el sobre, una de cada tipo.
+mundo_con_sobre(Cartas, Mundo, mundo(Mundo, [S, A, L])) :-
+    cartas_del_sobre(sospechoso, Cartas, Mundo, S),
+    cartas_del_sobre(arma, Cartas, Mundo, A),
+    cartas_del_sobre(lugar, Cartas, Mundo, L).
+
+cartas_del_sobre(Tipo, Cartas, Mundo, Carta) :-
+    nth1(I, Mundo, 0),
+    nth1(I, Cartas, Carta),
+    carta(Tipo, Carta),
+    !.
+
+%!  entropia_esperada(+Sugerencia, +Cartas, +Orden, +Datos, -Puntos) is det.
+%
+%   Puntos es la incertidumbre (en bits) que se espera que quede sobre el
+%   sobre tras hacer la Sugerencia, si los Datos (mundos posibles) son
+%   representativos: menos es mejor. Es la suma de la entropía de cada
+%   tipo (sospechoso, arma, lugar) dentro de cada grupo de mundos que
+%   darían la misma respuesta, ponderada por el tamaño del grupo.
+%
+%   La respuesta es quién refuta y qué carta enseña. Si quien refuta
+%   tiene varias de las tres, cada una es igual de probable.
+
+entropia_esperada(sugerencia(S, A, L), Cartas, Orden, Datos, Puntos) :-
+    once(nth1(IS, Cartas, S)), once(nth1(IA, Cartas, A)), once(nth1(IL, Cartas, L)),
+    maplist(respuestas_del_mundo([S-IS, A-IA, L-IL], Orden), Datos, Listas),
+    append(Listas, Entradas),
+    keysort(Entradas, Ordenadas),
+    group_pairs_by_key(Ordenadas, Grupos),
+    maplist(incertidumbre_del_grupo, Grupos, Pesos),
+    sum_list(Pesos, Suma),
+    length(Datos, NMundos),
+    Puntos is Suma / NMundos.
+
+% Lo que respondería cada jugador en un mundo, como Respuesta-Peso+Sobre.
+respuestas_del_mundo(Tuyas, Orden, mundo(Mundo, Sobre), Entradas) :-
+    (   member(J, Orden),
+        findall(C, ( member(C-I, Tuyas), nth1(I, Mundo, J) ), Tiene),
+        Tiene = [_|_]
+    ->  length(Tiene, K),
+        Peso is 1.0 / K,
+        findall(J-C-(Peso-Sobre), member(C, Tiene), Entradas)
+    ;   Entradas = [nadie-(1.0-Sobre)]
+    ).
+
+% Un grupo de mundos con la misma respuesta: su peso total por la
+% incertidumbre sobre el sobre que queda dentro de él.
+incertidumbre_del_grupo(_-Miembros, Valor) :-
+    findall(P, member(P-_, Miembros), Pesos),
+    sum_list(Pesos, Total),
+    findall(Hs,
+            ( member(Pos, [1, 2, 3]),
+              findall(Carta-P, ( member(P-Sobre, Miembros), nth1(Pos, Sobre, Carta) ), Pares),
+              entropia(Pares, Total, Hs) ),
+            [H1, H2, H3]),
+    Valor is Total * (H1 + H2 + H3).
+
+% Entropía (en bits) de una distribución dada por pesos por carta.
+entropia(Pares, Total, H) :-
+    keysort(Pares, Ordenados),
+    group_pairs_by_key(Ordenados, Grupos),
+    foldl(suma_de_entropia(Total), Grupos, 0.0, H).
+
+suma_de_entropia(Total, _-Pesos, H0, H) :-
+    sum_list(Pesos, W),
+    Pr is W / Total,
+    H is H0 - Pr * log(Pr) / log(2).

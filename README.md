@@ -12,7 +12,7 @@ Los oponentes son una IA escrita en Prolog. Cada jugada (quién mostró una cart
 
 ## Estado
 
-🚧 En desarrollo. **Ya se puede jugar una partida completa por la terminal** contra IAs de tres niveles. Falta la interfaz web, la IA difícil y la explicación de las deducciones.
+🚧 En desarrollo. **Ya se puede jugar una partida completa por la terminal** contra IAs de cuatro niveles y en el navegador. Falta la explicación de las deducciones.
 
 ## Requisitos
 
@@ -26,7 +26,7 @@ swipl src/jugar.pl
 
 Juegas tú (el jugador 1) contra tres IAs: una media y dos fáciles. Escribe el número de la opción que quieras; con Ctrl-D abandonas.
 
-Puedes elegir los rivales, de 2 a 4, entre `azar`, `facil` y `media`:
+Puedes elegir los rivales, de 2 a 4, entre `azar`, `facil`, `media` y `dificil`:
 
 ```bash
 swipl src/jugar.pl media media facil
@@ -90,13 +90,21 @@ La IA dedujo la solución sin haber visto esas cartas, solo a partir de quién r
 swipl -q -g run_tests -t halt tests/todos.pl
 ```
 
-Ejecuta los 495 tests (`tests/test_juego.pl`, `tests/test_deduccion.pl`, `tests/test_consola.pl`, `tests/test_ia.pl`, `tests/test_jugador.pl`, `tests/test_turnos.pl`, `tests/test_sherlog.pl` y `tests/test_servidor.pl`, con [plunit](https://www.swi-prolog.org/pldoc/man?section=plunit)). Muestra el progreso, marca con `FAILED` los que fallen y termina con código 0 si todos pasan o con 1 si alguno falla (se comprueba con `echo $status` en fish, o `echo $?` en bash). Tarda unos 50 segundos (los tests de probabilidades y las partidas completas con la IA media son los más lentos). Los de la consola no usan el teclado: leen de un texto y escriben en otro.
+Ejecuta los 516 tests (`tests/test_juego.pl`, `tests/test_deduccion.pl`, `tests/test_consola.pl`, `tests/test_ia.pl`, `tests/test_jugador.pl`, `tests/test_turnos.pl`, `tests/test_sherlog.pl` y `tests/test_servidor.pl`, con [plunit](https://www.swi-prolog.org/pldoc/man?section=plunit)). Muestra el progreso, marca con `FAILED` los que fallen y termina con código 0 si todos pasan o con 1 si alguno falla (se comprueba con `echo $status` en fish, o `echo $?` en bash). Tarda unos dos minutos (los tests de probabilidades y las partidas completas con la IA media son los más lentos). Los de la consola no usan el teclado: leen de un texto y escriben en otro.
 
 Para ejecutar solo un archivo:
 
 ```bash
 swipl -q -g run_tests -t halt tests/test_deduccion.pl
 ```
+
+### La IA difícil contra la media
+
+```bash
+swipl tests/dificil_vs_media.pl
+```
+
+Juega 50 partidas de tres jugadores (una difícil y dos medias, cambiando el asiento de la difícil) y cuenta cuántas gana. Si todos jugaran igual, cada uno ganaría el 33 %. Comprueba también que la difícil nunca queda eliminada y que ninguna decisión tarda 2 s. Tarda unos dos minutos; acepta el número de partidas y una semilla: `swipl tests/dificil_vs_media.pl 20 7`.
 
 ### Partidas largas
 
@@ -112,7 +120,7 @@ No forma parte de `todos.pl` porque tarda más.
 
 - [x] Motor de deducción con restricciones
 - [x] Partida completa en consola: turnos, sugerencias, refutaciones y acusación
-- [ ] Niveles de IA: fácil (al azar), medio (deducción) y difícil (ganancia de información)
+- [x] Niveles de IA: fácil, medio (deducción) y difícil (ganancia de información)
 - [ ] Explicación de por qué la IA acusa (metaintérprete)
 - [ ] Interfaz web con la libreta de detective de la IA
 - [ ] Torneo entre niveles de IA

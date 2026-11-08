@@ -175,8 +175,8 @@ observar(Jugador, Evento, Jugador1) :-
 %       media     convierte en restricciones todo lo que ve y deduce qué
 %                 puede estar en el sobre; acusa solo cuando es seguro; y al
 %                 refutar procura revelar lo menos posible (ia.pl)
-%       dificil   POR AHORA juega al azar; además elegirá la mejor
-%                 sugerencia                                          (#21)
+%       dificil   como la media, pero sugiere lo que más reduce su
+%                 incertidumbre sobre el sobre (ia.pl)
 
 elige_accion(azar,    J, _, Accion, J) :- accion_al_azar(Accion).
 elige_accion(web,     J, Vista, Accion, J) :-
@@ -191,7 +191,9 @@ elige_accion(facil,   J, _, Accion, J) :-
 elige_accion(media,   J, _, Accion, J) :-
     J = jugador(_, media, mente(K, _)),
     media_accion(K, Accion).
-elige_accion(dificil, J, _, Accion, J) :- accion_al_azar(Accion).
+elige_accion(dificil, J, _, Accion, J) :-
+    J = jugador(_, dificil, mente(K, _)),
+    dificil_accion(K, Accion).
 
 elige_carta(azar,    J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
 elige_carta(web,     J, Sugerencia, Candidatas, Carta, J) :-
@@ -203,7 +205,9 @@ elige_carta(facil,   J, _, Candidatas, Carta, J) :- random_member(Carta, Candida
 elige_carta(media, jugador(Id, media, mente(K, Mostradas)), sugerencia(Quien, _),
             Candidatas, Carta, jugador(Id, media, mente(K, Mostradas1))) :-
     media_carta_a_mostrar(Mostradas, Quien, Candidatas, Carta, Mostradas1).
-elige_carta(dificil, J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
+elige_carta(dificil, jugador(Id, dificil, mente(K, Mostradas)), sugerencia(Quien, _),
+            Candidatas, Carta, jugador(Id, dificil, mente(K, Mostradas1))) :-
+    media_carta_a_mostrar(Mostradas, Quien, Candidatas, Carta, Mostradas1).
 
 observa(azar,    J, _, J).
 observa(web, J, Evento, J) :-
@@ -217,7 +221,9 @@ observa(facil, jugador(Id, facil, vistas(Vistas)), Evento, jugador(Id, facil, vi
 observa(media, J, Evento, J) :-
     J = jugador(Id, media, mente(K, _)),
     media_observar(Id, Evento, K).
-observa(dificil, J, _, J).
+observa(dificil, J, Evento, J) :-
+    J = jugador(Id, dificil, mente(K, _)),
+    media_observar(Id, Evento, K).
 
 % Una de cada diez veces acusa; el resto, sugiere.
 accion_al_azar(Accion) :-

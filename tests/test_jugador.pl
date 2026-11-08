@@ -116,11 +116,16 @@ test(la_vista_no_contiene_el_sobre_ni_las_manos_ajenas) :-
 
 vista_vacia(vista([], [], [])).
 
+% La IA difícil piensa con muestras (medio segundo por decisión): menos repeticiones.
+veces(dificil, 2) :- !.
+veces(_, 15).
+
 test(elegir_accion_da_sugerir_o_acusar_con_tres_cartas_validas,
      [forall(member(Tipo, [facil, media, dificil, azar]))]) :-
     partida_de_prueba(P), nuevo_jugador(1, Tipo, P, J),
     vista_vacia(V),
-    forall(between(1, 15, _),
+    veces(Tipo, Veces),
+    forall(between(1, Veces, _),
            ( elegir_accion(J, V, Accion, _),
              Accion =.. [Que, S, A, L],
              memberchk(Que, [sugerir, acusar]),
