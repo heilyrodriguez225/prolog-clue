@@ -72,7 +72,9 @@ api_error(Codigo, Estado, Mensaje) :-
 %
 %   Lo que la página necesita saber antes de empezar.
 
-api_config(_{cartas: Cartas, niveles: Niveles, rivales: _{min: 2, max: 4}}) :-
+api_config(_{cartas: Cartas, niveles: Niveles, nombres: Nombres,
+             rivales: _{min: 2, max: 4}}) :-
+    nombres_de_ias(Nombres),
     findall(_{id: Id, nombre: Nombre, tipo: Tipo},
             ( carta(Tipo, Id), nombre(Id, Nombre) ),
             Cartas),

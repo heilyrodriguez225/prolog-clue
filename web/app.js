@@ -180,7 +180,7 @@ function pintarLibreta() {
   document.getElementById('progreso-txt').textContent = `${descartadas} de ${total} descartadas`;
   document.getElementById('progreso-rel').style.width = `${Math.min(100, (descartadas / total) * 100)}%`;
   const espectar = estado.modo === 'espectar';
-  document.getElementById('libreta-titulo').textContent = espectar ? 'IA (jugador 1)' : 'Detective';
+  document.getElementById('libreta-titulo').textContent = espectar ? 'IA (jugador 1)' : estado.jugadores[0].nombre;
 }
 
 // ---------- Acciones ----------

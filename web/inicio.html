@@ -70,25 +70,9 @@
     </div>
 
     <div class="campo">
-      <div class="num-etiqueta"><span class="num">03</span><span class="txt">Dificultad</span></div>
-      <div id="dificultad">
-        <button type="button" class="op-dificultad" data-valor="facil">
-          <span class="puntos">●○○</span>
-          <span class="txt"><span class="titulo">Fácil</span><span class="desc">Sugiere al azar y recuerda poco</span></span>
-          <span class="radio"></span>
-        </button>
-        <button type="button" class="op-dificultad sel" data-valor="medio">
-          <span class="puntos">●●○</span>
-          <span class="txt"><span class="titulo">Medio</span><span class="desc">Deduce con todas las restricciones</span></span>
-          <span class="radio"></span>
-        </button>
-        <button type="button" class="op-dificultad" data-valor="dificil">
-          <span class="puntos">●●●</span>
-          <span class="txt"><span class="titulo">Difícil</span><span class="desc">Maximiza la ganancia de información</span></span>
-          <span class="radio"></span>
-        </button>
-      </div>
-      <div class="ayuda">👁 Un desafío equilibrado</div>
+      <div class="num-etiqueta"><span class="num">03</span><span class="txt">Nivel de cada rival</span></div>
+      <div id="niveles-rivales"></div>
+      <div class="ayuda" id="ayuda-niveles"></div>
     </div>
 
     <div class="campo">
@@ -128,7 +112,6 @@
     }));
   }
   exclusivo('rivales', '.op-rival');
-  exclusivo('dificultad', '.op-dificultad');
   // La demo necesita la libreta: encenderla y no dejar apagarla.
   document.getElementById('espectador').addEventListener('change', (ev) => {
     const a = document.getElementById('asistente');
@@ -136,16 +119,65 @@
     a.disabled = ev.target.checked;
   });
 
-  // La dificultad de la maqueta es una sola para todos; la elección por rival es la #22.
-  const NIVELES = { facil: 'facil', medio: 'media', dificil: 'dificil' };
+  // Un nivel por rival. La API usa facil, media y dificil; la página dice Fácil, Medio y Difícil.
+  const NIVELES = [
+    { api: 'facil', texto: 'Fácil', desc: 'Sugiere lo que no ha visto y acusa cuando le queda una carta de cada tipo' },
+    { api: 'media', texto: 'Medio', desc: 'Deduce con restricciones todo lo que ve en la mesa' },
+    { api: 'dificil', texto: 'Difícil', desc: 'Pregunta lo que más reduce su incertidumbre' },
+  ];
+  let nombresIA = ['Beto', 'Cleo', 'Dani', 'Elena'];
+  // Por defecto: una media y las demás fáciles.
+  const elegidos = ['media', 'facil', 'facil', 'facil'];
+
+  fetch('/api/config').then((r) => r.json()).then((c) => { nombresIA = c.nombres; pintarNiveles(); }).catch(() => {});
+
+  function cuantosRivales() {
+    return Number(document.querySelector('#rivales .sel').dataset.valor);
+  }
+
+  function pintarNiveles() {
+    const cont = document.getElementById('niveles-rivales');
+    cont.innerHTML = '';
+    for (let i = 0; i < cuantosRivales(); i++) {
+      const fila = document.createElement('div');
+      fila.className = 'fila-nivel';
+      const etiqueta = document.createElement('span');
+      etiqueta.className = 'rival-nombre';
+      etiqueta.textContent = nombresIA[i] + ' (IA)';
+      fila.append(etiqueta);
+      const grupo = document.createElement('div');
+      grupo.className = 'grupo-nivel';
+      for (const n of NIVELES) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'op-nivel' + (elegidos[i] === n.api ? ' sel' : '');
+        b.textContent = n.texto;
+        b.title = n.desc;
+        b.addEventListener('click', () => { elegidos[i] = n.api; pintarNiveles(); });
+        grupo.append(b);
+      }
+      fila.append(grupo);
+      cont.append(fila);
+    }
+    const dificiles = elegidos.slice(0, cuantosRivales()).filter((x) => x === 'dificil').length;
+    document.getElementById('ayuda-niveles').textContent = dificiles
+      ? '👁 La IA difícil piensa un poco más en cada turno'
+      : '👁 Elige el nivel de cada rival: se ve en su asiento';
+  }
+
+  document.querySelectorAll('#rivales .op-rival').forEach((b) => b.addEventListener('click', pintarNiveles));
+  pintarNiveles();
 
   document.getElementById('entrar').addEventListener('click', async (ev) => {
     ev.preventDefault();
-    const cuantos = Number(document.querySelector('#rivales .sel').dataset.valor);
-    const nivel = NIVELES[document.querySelector('#dificultad .sel').dataset.valor];
-    const real = nivel;
     const espectador = document.getElementById('espectador').checked;
-    const cuerpo = { nombre: nombre.value, asistente: espectador || document.getElementById('asistente').checked, modo: espectador ? 'espectador' : 'jugar', rivales: Array.from({ length: cuantos }, () => ({ nivel: real })) };
+    const rivales = elegidos.slice(0, cuantosRivales()).map((nivel) => ({ nivel }));
+    const cuerpo = {
+      nombre: nombre.value,
+      asistente: espectador || document.getElementById('asistente').checked,
+      modo: espectador ? 'espectador' : 'jugar',
+      rivales,
+    };
     try {
       const r = await fetch('/api/partida', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo),

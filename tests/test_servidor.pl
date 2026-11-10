@@ -48,7 +48,9 @@ test(config) :-
     api_config(C),
     length(C.cartas, 21),
     C.rivales.min =:= 2, C.rivales.max =:= 4,
-    memberchk(media, C.niveles).
+    memberchk(media, C.niveles),
+    memberchk(dificil, C.niveles),
+    length(C.nombres, 4).
 
 test(crear_da_estado_inicial) :-
     crear([_{nivel: "facil"}, _{nivel: "media"}], Id, _),
@@ -60,6 +62,15 @@ test(cada_rival_tiene_su_nivel) :-
     crear([_{nivel: "facil"}, _{nivel: "media"}, _{nivel: "azar"}], Id, E),
     findall(N, ( member(J, E.jugadores), get_dict(nivel, J, N) ), Niveles),
     Niveles == [null, facil, media, azar],
+    api_abandonar(Id).
+
+test(una_dificil_y_dos_faciles_cada_asiento_con_su_nivel_y_se_juega_hasta_el_final) :-
+    crear([_{nivel: "dificil"}, _{nivel: "facil"}, _{nivel: "facil"}], Id, E0),
+    findall(N-Nombre, ( member(J, E0.jugadores), get_dict(nivel, J, N), get_dict(nombre, J, Nombre) ), Pares),
+    Pares = [null-"Ana", dificil-N2, facil-N3, facil-N4],
+    sort([N2, N3, N4], [_, _, _]),            % cada IA con su propio nombre
+    jugar_al_azar(Id, F),
+    F.estado == fin,
     api_abandonar(Id).
 
 test(la_mano_coincide_con_las_cartas) :-
