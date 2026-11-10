@@ -24,7 +24,9 @@
             api_accion/3,
             api_carta/3,
             api_abandonar/1,
-            limpiar_partidas/0
+            limpiar_partidas/0,
+            poner_maximo_de_partidas/1,
+            direccion_de_escucha/2
           ]).
 
 :- use_module(library(http/thread_httpd)).
@@ -36,6 +38,7 @@
 :- use_module(library(apply)).
 :- use_module(library(random)).
 :- use_module(library(error)).
+:- use_module(library(aggregate)).
 :- use_module(juego, [carta/2, nombre/2]).
 :- use_module(deduccion, [conocimiento_inicial/3, cuentas/2]).
 :- use_module(jugador).
@@ -52,9 +55,36 @@
    absolute_file_name(Relativa, Web),
    asserta(user:file_search_path(sherlog_web, Web)).
 
+:- multifile prolog:message//1.
+
+prolog:message(error_en_partida(Id, Error)) -->
+    [ 'Sherlog: error en la partida ~w: ~p'-[Id, Error] ].
+prolog:message(error_en_peticion(Error)) -->
+    [ 'Sherlog: error al atender una petición: ~p'-[Error] ].
+
 :- dynamic partida_/4.      % partida_(Id, Hilo, Cola, UltimaActividad)
 
 nombres_de_ias([ 'Beto', 'Cleo', 'Dani', 'Elena' ]).
+
+% Cada partida es un hilo con su propio conocimiento: hay un tope.
+:- dynamic maximo_de_partidas_/1.
+maximo_de_partidas_(20).
+
+%!  poner_maximo_de_partidas(+N) is det.
+
+poner_maximo_de_partidas(N) :-
+    must_be(positive_integer, N),
+    retractall(maximo_de_partidas_(_)),
+    assertz(maximo_de_partidas_(N)).
+
+comprobar_tope_de_partidas :-
+    maximo_de_partidas_(Max),
+    aggregate_all(count, partida_(_, _, _, _), Actuales),
+    (   Actuales >= Max
+    ->  api_error(demasiadas_partidas, 503,
+                  "Hay demasiadas partidas abiertas. Termina o abandona alguna.")
+    ;   true
+    ).
 
 minutos_sin_actividad(30).
 minutos_tras_el_fin(10).
@@ -90,6 +120,7 @@ api_crear(Entrada, Estado) :-
     asistente_de(Entrada, Asistente),
     modo_de(Entrada, Asistente, Modo),
     limpiar_partidas,
+    comprobar_tope_de_partidas,
     nuevo_id(Id),
     message_queue_create(Cola),
     registrar_partida(Id, Cola),
@@ -143,7 +174,7 @@ asistente_de(Entrada, Asistente) :-
 modo_de(Entrada, Asistente, Modo) :-
     (   get_dict(modo, Entrada, Texto), a_atomo(Texto, espectador)
     ->  (   Asistente == true
-        ->  Modo = espectar
+        ->  Modo = espectador
         ;   api_error(modo_invalido, 400, "El modo espectador necesita la libreta activada.")
         )
     ;   Modo = jugar
@@ -379,8 +410,9 @@ terminar_con_error(Id, partida_abandonada) :-
     !,
     catch(publicar(Id, _{estado: abandonada, pendiente: null}), _, true).
 terminar_con_error(Id, Error) :-
-    term_to_atom(Error, Texto),
-    catch(publicar(Id, _{estado: error, pendiente: null, mensaje: Texto}), _, true).
+    print_message(error, error_en_partida(Id, Error)),     % el detalle, solo en el servidor
+    catch(publicar(Id, _{estado: error, pendiente: null,
+                         mensaje: "La partida ha tenido un error interno."}), _, true).
 
 %   ---------------------------------------------------------------------
 %   Texto y átomos
@@ -454,8 +486,8 @@ leer_json(Request, Entrada) :-
 
 salida_de_error(api_error(Codigo, Estado, Mensaje), Estado-_{error: Codigo, mensaje: Mensaje}) :-
     !.
-salida_de_error(Error, 500-_{error: error_interno, mensaje: Texto}) :-
-    term_to_atom(Error, Texto).
+salida_de_error(Error, 500-_{error: error_interno, mensaje: "Error interno del servidor."}) :-
+    print_message(error, error_en_peticion(Error)).    % el detalle, solo en el servidor
 
 responder_json(Estado-Dict) :-
     reply_json_dict(Dict, [status(Estado)]).
@@ -474,7 +506,8 @@ manejar_archivos(Request) :-
 
 %!  servidor_arrancar(+Opciones) is det.
 %
-%   Opciones: port(Puerto), retardo(Segundos). Si Puerto queda sin
+%   Opciones: port(Puerto), retardo(Segundos) y escuchar(todas) (por
+%   defecto solo se atiende a este ordenador). Si Puerto queda sin
 %   concretar se elige uno libre y se devuelve en la misma variable.
 
 servidor_arrancar(Opciones) :-
@@ -483,7 +516,21 @@ servidor_arrancar(Opciones) :-
     ;   true
     ),
     memberchk(port(Puerto), Opciones),
-    http_server(http_dispatch, [port(Puerto)]).
+    % Solo se escucha en este ordenador, salvo que se pida lo contrario:
+    % cualquiera de la red podría abrir partidas.
+    direccion_de_escucha(Opciones, Direccion),
+    http_server(http_dispatch, [port(Puerto)|Direccion]).
+
+%!  direccion_de_escucha(+Opciones, -Direccion) is det.
+%
+%   Direccion son las opciones de http_server/2 que limitan a quién se
+%   atiende: solo a este ordenador, salvo con escuchar(todas).
+
+direccion_de_escucha(Opciones, Direccion) :-
+    (   memberchk(escuchar(todas), Opciones)
+    ->  Direccion = []
+    ;   Direccion = [ip(localhost)]
+    ).
 
 %!  servidor_parar(+Puerto) is det.
 

@@ -57,7 +57,7 @@ Sugieres: Chef Canela, Trofeo y Biblioteca.
 swipl src/servir.pl
 ```
 
-Abre http://localhost:8080. En la pantalla de inicio eliges tu nombre, de 2 a 4 rivales y **el nivel de cada uno** (por ejemplo, una difícil y dos fáciles). El servidor sirve la página de `web/` y la API JSON descrita en `PLAN.md` (§3, "La API web"). Cada partida corre en su propio hilo. Con `swipl src/servir.pl 9000` usas otro puerto.
+Abre http://localhost:8080. En la pantalla de inicio eliges tu nombre, de 2 a 4 rivales y **el nivel de cada uno** (por ejemplo, una difícil y dos fáciles). El servidor sirve la página de `web/` y la API JSON descrita en `PLAN.md` (§3, "La API web"). Cada partida corre en su propio hilo. Con `swipl src/servir.pl 9000` usas otro puerto. Por defecto solo se atiende a tu ordenador; con `swipl src/servir.pl 8080 abierto` también a tu red local.
 
 La **libreta** del detective se rellena sola con lo que deduce el motor (descartadas, cartas seguras y el % de cada carta); se puede apagar al crear la partida. Marcando *Modo demo* juega la IA en tu lugar y ves su libreta pensar.
 
@@ -90,7 +90,7 @@ La IA dedujo la solución sin haber visto esas cartas, solo a partir de quién r
 swipl -q -g run_tests -t halt tests/todos.pl
 ```
 
-Ejecuta los 517 tests (`tests/test_juego.pl`, `tests/test_deduccion.pl`, `tests/test_consola.pl`, `tests/test_ia.pl`, `tests/test_jugador.pl`, `tests/test_turnos.pl`, `tests/test_sherlog.pl` y `tests/test_servidor.pl`, con [plunit](https://www.swi-prolog.org/pldoc/man?section=plunit)). Muestra el progreso, marca con `FAILED` los que fallen y termina con código 0 si todos pasan o con 1 si alguno falla (se comprueba con `echo $status` en fish, o `echo $?` en bash). Tarda unos dos minutos (los tests de probabilidades y las partidas completas con la IA media son los más lentos). Los de la consola no usan el teclado: leen de un texto y escriben en otro.
+Ejecuta los 522 tests (`tests/test_juego.pl`, `tests/test_deduccion.pl`, `tests/test_consola.pl`, `tests/test_ia.pl`, `tests/test_jugador.pl`, `tests/test_turnos.pl`, `tests/test_sherlog.pl` y `tests/test_servidor.pl`, con [plunit](https://www.swi-prolog.org/pldoc/man?section=plunit)). Muestra el progreso, marca con `FAILED` los que fallen y termina con código 0 si todos pasan o con 1 si alguno falla (se comprueba con `echo $status` en fish, o `echo $?` en bash). Tarda unos dos minutos (los tests de probabilidades y las partidas completas con la IA media son los más lentos). Los de la consola no usan el teclado: leen de un texto y escriben en otro.
 
 Para ejecutar solo un archivo:
 

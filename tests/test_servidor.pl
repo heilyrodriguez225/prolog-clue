@@ -173,6 +173,13 @@ test(carta_cuando_no_toca, [true(C == no_esperas_carta)]) :-
     codigo(api_carta(Id, _{carta: "daga"}, _), C),
     api_abandonar(Id).
 
+test(hay_un_tope_de_partidas, [true(C == demasiadas_partidas), cleanup(poner_maximo_de_partidas(20))]) :-
+    poner_maximo_de_partidas(1),
+    crear([_{nivel: "facil"}, _{nivel: "facil"}], Id, _),
+    esperar_estado(Id, _),
+    codigo(api_crear(_{rivales: [_{nivel: "facil"}, _{nivel: "facil"}]}, _), C),
+    api_abandonar(Id).
+
 test(abandonar_borra_la_partida, [true(C == partida_no_existe)]) :-
     crear([_{nivel: "facil"}, _{nivel: "facil"}], Id, _),
     esperar_estado(Id, _),
@@ -311,7 +318,7 @@ test(espectador_juega_sola_y_la_libreta_llega_al_100) :-
 una_partida_espectador :-
     api_crear(_{nombre: "IA", modo: "espectador",
                 rivales: [_{nivel: "facil"}, _{nivel: "azar"}]}, E0),
-    E0.modo == espectar,
+    E0.modo == espectador,
     Id = E0.id,
     esperar_estado(Id, F),
     F.estado == fin,
@@ -393,6 +400,23 @@ test(la_pagina_se_sirve) :-
     pedir_puerto(P),
     pedir(P, get, '/inicio.html', none, 200, Html),
     once(sub_string(Html, _, _, _, "html")).
+
+test(un_error_interno_no_cuenta_detalles) :-
+    pedir_puerto(P),
+    % un cuerpo que no es un objeto JSON: error de la petición, sin términos de Prolog
+    pedir(P, post, '/api/partida', [1, 2], 400, R),
+    R.error == "json_invalido",
+    \+ sub_string(R.mensaje, _, _, _, "error(").
+
+test(por_defecto_solo_se_escucha_en_este_ordenador, [true(D == [ip(localhost)])]) :-
+    direccion_de_escucha([port(_)], D).
+
+test(se_puede_abrir_a_la_red_si_se_pide, [true(D == [])]) :-
+    direccion_de_escucha([port(_), escuchar(todas)], D).
+
+test(el_servidor_de_prueba_escucha_en_127_0_0_1) :-
+    pedir_puerto(P),
+    setup_call_cleanup(tcp_socket(S), tcp_connect(S, '127.0.0.1':P), tcp_close_socket(S)).
 
 test(lo_que_no_existe_da_404) :-
     pedir_puerto(P),

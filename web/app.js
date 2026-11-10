@@ -94,7 +94,7 @@ function pintarEncabezado() {
   document.getElementById('pildora-turno-nombre').textContent = texto;
   const aviso = document.getElementById('aviso-turno');
   const tuTurno = estado.estado === 'esperando';
-  aviso.textContent = estado.modo === 'espectar' && estado.estado !== 'fin' ? 'Modo demo: observas pensar a la IA.'
+  aviso.textContent = estado.modo === 'espectador' && estado.estado !== 'fin' ? 'Modo demo: observas pensar a la IA.'
     : tuTurno ? 'Es tu turno: sugiere o acusa.' : estado.estado === 'fin' ? '' : 'Esperando a los demás…';
   aviso.classList.toggle('tu-turno', tuTurno);
 }
@@ -179,8 +179,8 @@ function pintarLibreta() {
   const descartadas = Object.values(estados).filter((e) => e.clase === 'descartado').length;
   document.getElementById('progreso-txt').textContent = `${descartadas} de ${total} descartadas`;
   document.getElementById('progreso-rel').style.width = `${Math.min(100, (descartadas / total) * 100)}%`;
-  const espectar = estado.modo === 'espectar';
-  document.getElementById('libreta-titulo').textContent = espectar ? 'IA (jugador 1)' : estado.jugadores[0].nombre;
+  const espectador = estado.modo === 'espectador';
+  document.getElementById('libreta-titulo').textContent = espectador ? 'IA (jugador 1)' : estado.jugadores[0].nombre;
 }
 
 // ---------- Acciones ----------
@@ -278,7 +278,7 @@ function pintarFin() {
   clavePendiente = 'fin';
   const f = estado.fin;
   let titulo, motivo;
-  if (estado.modo === 'espectar') {
+  if (estado.modo === 'espectador') {
     titulo = f.ganador === 1 ? 'La IA ha ganado' : f.ganador === null ? 'La IA se ha equivocado' : `Gana ${nombreJugador(f.ganador)}`;
     motivo = f.ganador === 1 ? 'Acusó con la solución deducida: mira su libreta.' : 'La partida termina aquí.';
   } else if (f.ganador === 1) {

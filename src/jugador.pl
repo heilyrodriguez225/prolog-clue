@@ -5,13 +5,13 @@
         jugador(Id, Tipo, Memoria)
 
     - Id es el número de jugador (1 es el humano).
-    - Tipo es azar, humano, facil, media o dificil.
+    - Tipo es azar, humano, facil, media, dificil o web.
     - Memoria es lo que ese jugador sabe y los demás no. Su forma
       depende del tipo:
 
           azar, humano    []
           web             web(Id, Asistente, Modo)   la partida, su asistente (o none)
-                                               y el modo: jugar o espectar
+                                               y el modo: jugar o espectador
           facil           vistas(Cartas)   las cartas que ha visto
           media, dificil  mente(K, Mostradas)
                             K          el conocimiento de deduccion.pl,

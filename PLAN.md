@@ -242,7 +242,7 @@ Los `POST` devuelven el estado enseguida; **la página consulta `GET` cada poco*
 
 | Campo | Valores |
 |---|---|
-| `modo` | `jugar` o `espectar` (demo: la IA juega por el jugador 1) |
+| `modo` | `jugar` o `espectador` (demo: la IA juega por el jugador 1) |
 | `estado` | `jugando` (juega una IA), `esperando` (te toca: mira `pendiente`) o `fin` |
 | `pendiente` | `null`; `{"tipo": "accion"}` (sugerir o acusar); o `{"tipo": "carta", "sugerencia": {"quien": 2, "cartas": [...]}, "candidatas": [...]}` (tienes que refutar) |
 | `historial[].carta_vista` | Solo en tus sugerencias, y solo si alguien refutó: `{"jugador": 3, "carta": "daga"}`. En las de los demás, siempre `null` |

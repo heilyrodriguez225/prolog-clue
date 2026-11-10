@@ -126,7 +126,7 @@ esperar(Id, Mensaje) :-
 %   Le toca jugar al jugador web. Deja el estado a la vista, avisa de que
 %   se espera una acción y espera un mensaje accion(Tipo, [S, A, L]).
 
-web_preguntar_accion(Id, Yo, Asistente, espectar, Vista, Accion) :-
+web_preguntar_accion(Id, Yo, Asistente, espectador, Vista, Accion) :-
     !,
     % Modo demo: la IA media juega con este conocimiento y la libreta la muestra.
     Vista = vista(Mano, _, _),
@@ -156,7 +156,7 @@ espera_accion(Id, Accion) :-
 %   que elegir; si tiene varias, espera un mensaje carta(Carta).
 
 web_preguntar_carta(_, _, _, [Unica], Unica) :- !.
-web_preguntar_carta(_, espectar, _, Candidatas, Carta) :- !,
+web_preguntar_carta(_, espectador, _, Candidatas, Carta) :- !,
     random_member(Carta, Candidatas).
 web_preguntar_carta(Id, jugar, sugerencia(Quien, Cartas), Candidatas, Carta) :-
     publicar(Id, _{estado: esperando,

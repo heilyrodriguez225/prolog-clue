@@ -244,10 +244,15 @@ dificil_accion(K, Accion) :-
 dificil_accion(K, Opciones, Accion) :-
     (   solucion_segura(K, sobre(S, A, L))
     ->  Accion = acusar(S, A, L)
-    ;   catch(mejor_sugerencia(K, Opciones, Accion), error(_, _), fail)
+    ;   catch(mejor_sugerencia(K, Opciones, Accion), error(Error, _), avisar_y_fallar(Error))
     ->  true
     ;   media_accion(K, Accion)       % sin mundos que mirar: la media
     ).
+
+% Si la difícil falla de verdad, que no sea en silencio: se avisa y juega como la media.
+avisar_y_fallar(Error) :-
+    print_message(warning, format("IA difícil: ~p. Juega como la media esta vez.", [Error])),
+    fail.
 
 mejor_sugerencia(K, Opciones, sugerir(S, A, L)) :-
     option(muestras(Muestras), Opciones, 200),
