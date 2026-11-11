@@ -106,6 +106,16 @@ swipl tests/dificil_vs_media.pl
 
 Juega 50 partidas de tres jugadores (una difícil y dos medias, cambiando el asiento de la difícil) y cuenta cuántas gana. Si todos jugaran igual, cada uno ganaría el 33 %. Comprueba también que la difícil nunca queda eliminada y que ninguna decisión tarda 2 s. Tarda unos dos minutos; acepta el número de partidas y una semilla: `swipl tests/dificil_vs_media.pl 20 7`.
 
+### Torneo entre niveles
+
+```bash
+swipl tests/torneo.pl
+```
+
+Juega las 20 combinaciones posibles de tres niveles (`azar`, `facil`, `media`, `dificil`), 100 partidas cada una, con los asientos rotando. Mide victorias, jugadores eliminados por acusar mal y turnos por partida, y escribe `resultados/torneo.csv`, `resultados/torneo.md` y `resultados/torneo_tiempos.csv`. Usa todos los hilos del ordenador (en 12 hilos tarda unos 12 minutos). Con la misma semilla da exactamente la misma tabla, en serie o en paralelo (los tiempos van en un archivo aparte porque dependen de la máquina). Acepta partidas, semilla, hilos (o `serie`) y carpeta de salida: `swipl tests/torneo.pl 20 7 4 /tmp/res`.
+
+Resultado con la semilla 2026: la difícil gana 1,64 veces lo que le tocaría, la media 1,56, la fácil 0,60 y el azar 0,21. La difícil contra dos medias gana el 46 % de las partidas (el 33 % sería jugar igual); la diferencia con la media es pequeña.
+
 ### Partidas largas
 
 ```bash
