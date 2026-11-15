@@ -13,10 +13,13 @@
           web             web(Id, Asistente, Modo)   la partida, su asistente (o none)
                                                y el modo: jugar o espectador
           facil           vistas(Cartas)   las cartas que ha visto
-          media, dificil  mente(K, Mostradas)
+          media, dificil  mente(K, Mostradas, Registro)
                             K          el conocimiento de deduccion.pl,
                                        con sus restricciones CLP(FD)
                             Mostradas  las cartas que ha enseñado y a quién
+                            Registro   lo que ha visto, con el turno en que
+                                       ocurrió; de aquí sale la explicación
+                                       de lo que sabe (explicacion.pl)
 
     La memoria no se guarda con assert: el bucle de la partida lleva la
     lista de jugadores de turno en turno y cada operación devuelve el
@@ -44,6 +47,7 @@
 :- use_module(library(random)).
 :- use_module(deduccion).
 :- use_module(ia).
+:- use_module(explicacion, [registro_inicial/3, registrar/4]).
 :- use_module(consola).
 :- use_module(puente).
 :- use_module(juego, [carta/2]).
@@ -74,10 +78,12 @@ memoria_inicial(azar, _, _, []).
 memoria_inicial(web, _, _, web(sin_partida, none, jugar)).
 memoria_inicial(facil, Id, Partida, vistas(Mano)) :-
     mano_de(Id, Partida, Mano).
-memoria_inicial(media, Id, Partida, mente(K, [])) :-
-    conocimiento_inicial(Id, Partida, K).
-memoria_inicial(dificil, Id, Partida, mente(K, [])) :-
-    conocimiento_inicial(Id, Partida, K).
+memoria_inicial(media, Id, Partida, mente(K, [], Registro)) :-
+    conocimiento_inicial(Id, Partida, K),
+    registro_inicial(Id, Partida, Registro).
+memoria_inicial(dificil, Id, Partida, mente(K, [], Registro)) :-
+    conocimiento_inicial(Id, Partida, K),
+    registro_inicial(Id, Partida, Registro).
 
 mano_de(Id, partida(_, Manos, _, _, _), Mano) :-
     memberchk(Id-Mano, Manos).
@@ -189,10 +195,10 @@ elige_accion(facil,   J, _, Accion, J) :-
     J = jugador(_, facil, vistas(Vistas)),
     facil_accion(Vistas, Accion).
 elige_accion(media,   J, _, Accion, J) :-
-    J = jugador(_, media, mente(K, _)),
+    J = jugador(_, media, mente(K, _, _)),
     media_accion(K, Accion).
 elige_accion(dificil, J, _, Accion, J) :-
-    J = jugador(_, dificil, mente(K, _)),
+    J = jugador(_, dificil, mente(K, _, _)),
     dificil_accion(K, Accion).
 
 elige_carta(azar,    J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
@@ -202,11 +208,11 @@ elige_carta(web,     J, Sugerencia, Candidatas, Carta, J) :-
 elige_carta(humano,  J, Sugerencia, Candidatas, Carta, J) :-
     preguntar_carta(Sugerencia, Candidatas, Carta).
 elige_carta(facil,   J, _, Candidatas, Carta, J) :- random_member(Carta, Candidatas).
-elige_carta(media, jugador(Id, media, mente(K, Mostradas)), sugerencia(Quien, _),
-            Candidatas, Carta, jugador(Id, media, mente(K, Mostradas1))) :-
+elige_carta(media, jugador(Id, media, mente(K, Mostradas, R)), sugerencia(Quien, _),
+            Candidatas, Carta, jugador(Id, media, mente(K, Mostradas1, R))) :-
     media_carta_a_mostrar(Mostradas, Quien, Candidatas, Carta, Mostradas1).
-elige_carta(dificil, jugador(Id, dificil, mente(K, Mostradas)), sugerencia(Quien, _),
-            Candidatas, Carta, jugador(Id, dificil, mente(K, Mostradas1))) :-
+elige_carta(dificil, jugador(Id, dificil, mente(K, Mostradas, R)), sugerencia(Quien, _),
+            Candidatas, Carta, jugador(Id, dificil, mente(K, Mostradas1, R))) :-
     media_carta_a_mostrar(Mostradas, Quien, Candidatas, Carta, Mostradas1).
 
 observa(azar,    J, _, J).
@@ -218,12 +224,14 @@ observa(humano, J, Evento, J) :-
     mostrar_evento(Id, Evento).
 observa(facil, jugador(Id, facil, vistas(Vistas)), Evento, jugador(Id, facil, vistas(Vistas1))) :-
     facil_recordar(Evento, Vistas, Vistas1).
-observa(media, J, Evento, J) :-
-    J = jugador(Id, media, mente(K, _)),
-    media_observar(Id, Evento, K).
-observa(dificil, J, Evento, J) :-
-    J = jugador(Id, dificil, mente(K, _)),
-    media_observar(Id, Evento, K).
+observa(media, jugador(Id, media, mente(K, M, R)), Evento,
+        jugador(Id, media, mente(K, M, R1))) :-
+    media_observar(Id, Evento, K),
+    registrar(Id, Evento, R, R1).
+observa(dificil, jugador(Id, dificil, mente(K, M, R)), Evento,
+        jugador(Id, dificil, mente(K, M, R1))) :-
+    media_observar(Id, Evento, K),
+    registrar(Id, Evento, R, R1).
 
 % Una de cada diez veces acusa; el resto, sugiere.
 accion_al_azar(Accion) :-

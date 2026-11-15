@@ -86,6 +86,7 @@ La interfaz web no tiene lógica de juego: solo muestra el estado y envía las a
 juego.pl  ←  deduccion.pl  ←  ia.pl  ←  puente.pl  ←  jugador.pl  ←  turnos.pl  ←  sherlog.pl  ←  jugar.pl
                                                                     turnos.pl  ←  servidor.pl  ←  servir.pl
               juego.pl  ←  consola.pl  ↗  (jugador.pl también importa consola.pl)
+              juego.pl  ←  explicacion.pl  ↗  (jugador.pl también importa explicacion.pl)
 ```
 
 Por eso el bucle de la partida no vive en `juego.pl`: `jugador.pl` ya importa `juego.pl` (para las cartas) y el bucle necesita importar `jugador.pl`.
@@ -106,7 +107,7 @@ jugador(Id, Tipo, Memoria)
 |---|---|---|
 | `azar`, `humano` | `[]` | Nada: el humano ve por la consola y el de azar no aprende |
 | `facil` | `vistas(Cartas)` | Las cartas que ha visto |
-| `media`, `dificil` | `mente(K, Mostradas)` | `K`: el modelo CLP(FD) de `deduccion.pl`, con sus restricciones. `Mostradas`: las cartas que ha enseñado y a quién |
+| `media`, `dificil` | `mente(K, Mostradas, Registro)` | `K`: el modelo CLP(FD) de `deduccion.pl`, con sus restricciones. `Mostradas`: las cartas que ha enseñado y a quién. `Registro`: lo que ha visto, con el turno (`explicacion.pl`) |
 
 La memoria **nunca se guarda con `assert`** (se perderían las restricciones). Cada operación devuelve el jugador con la memoria actualizada.
 
@@ -279,6 +280,25 @@ Los `POST` devuelven el estado enseguida; **la página consulta `GET` cada poco*
 | Fácil | Sugiere al azar entre las cartas que no ha visto, solo recuerda las que le enseñan y acusa cuando le queda una sola de cada tipo |
 | Medio | Convierte en restricciones lo que ve (sugerencias de todos, quién no pudo refutar, cartas que le enseñan y acusaciones fallidas), sugiere entre las cartas que aún pueden estar en el sobre y acusa solo cuando `solucion_segura/2` lo demuestra. Al refutar repite la carta que ya enseñó a ese jugador, para no regalar información |
 | Difícil | Además elige la sugerencia que más reduce la incertidumbre (ganancia de información) |
+
+### La explicación (`explicacion.pl`)
+
+El motor CLP(FD) deduce pero no sabe explicar: sus restricciones no guardan el porqué. Por eso la explicación va aparte, con un **metaintérprete** (un intérprete de Prolog escrito en Prolog) que resuelve una meta y devuelve la **prueba**; de la prueba sale el texto en español.
+
+**Dónde se guarda lo que la IA ha visto.** En la memoria de las IAs media y difícil, que pasa a ser `mente(K, Mostradas, Registro)`. `Registro = registro(Turno, Obs)` apunta cada observación **con el turno en que ocurrió**: la mano, cuántas cartas tiene cada uno, las cartas que le enseñaron (`enseno/3`), quién no pudo refutar (`no_pudo/4`), quién refutó (`refuto/4`) y las acusaciones fallidas (`fallo/3`). Se saca de los mismos eventos que ya recibe `observar/3`, así que **no cambia el protocolo ni `turnos.pl`**. El número de turno es la cuenta de eventos públicos que ha visto, que coincide con el largo del historial. Es **su** registro y no el historial público, porque la carta que le enseñan a una IA es privada.
+
+**Las reglas** son datos, `regla(Nombre, Cabeza, Cuerpo)`:
+
+| Meta | Se prueba por |
+|---|---|
+| `tiene(J, C)` | `en_mi_mano`, `me_la_enseno`, o `refuto_con_la_unica` (J refutó y se sabe que no tiene dos de las tres) |
+| `no_tiene(J, C)` | `no_pudo_refutar`, `otro_la_tiene`, `no_esta_en_su_mano`, o `conozco_todas_sus_cartas` (ya se conocen las N cartas de J) |
+| `descartada(C)` | `alguien_la_tiene`, o `acusacion_fallida` (acusaron a tres y las otras dos están en el sobre) |
+| `en_sobre(C)` | `nadie_la_tiene`, o `la_unica_de_su_tipo` (todas las demás de su tipo están descartadas) |
+
+**El metaintérprete** `prueba(Registro, Meta, Arbol)` busca por profundidad creciente (hasta 6): sale la prueba más corta y las reglas que se llaman unas a otras (`tiene`/`no_tiene`) no se quedan dando vueltas. El árbol tiene `hecho(Obs)` y `por(Regla, Meta, Hijos)`. `explicar/3` lo pasa a texto citando turnos y nombres.
+
+**Qué no explica.** Razonamientos que combinan varias refutaciones a la vez o que exigen buscar (el motor sí los deduce). `tests/cobertura_explicacion.pl` contrasta las dos cosas: corrección (lo que prueba nunca contradice al motor ni al sobre real, 0 contradicciones) y cobertura (qué parte de lo que el motor sabe sabe explicar).
 
 **Riesgo conocido.** Con 21 cartas no se pueden enumerar todos los mundos posibles. Para saber qué cartas *pueden* estar en el sobre basta con comprobar, carta por carta, si existe al menos un mundo coherente. Las probabilidades se aproximan por muestreo (F1·04, F1·05).
 

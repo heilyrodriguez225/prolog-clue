@@ -80,9 +80,16 @@ Turno 7: Sugiero Chef Canela, Daga, Gimnasio (las dos primeras son mías). Nadie
   En el sobre: [Señora Coral,Cuerda,Gimnasio] · descartadas: 18 · dudosas: 0
 
 La IA acusa: fue Señora Coral, con Cuerda, en Gimnasio.
+
+¿Por qué? Esto es lo que la IA sabe y cuándo lo supo:
+
+- Señora Coral está en el sobre, porque ninguno de los 4 jugadores la tiene:
+  - Señora Coral no está en mi mano.
+  - El jugador 2 no tiene Señora Coral: en el turno 5, cuando yo sugerí Señora Coral, Cuerda, Biblioteca, no pudo refutar.
+  ...
 ```
 
-La IA dedujo la solución sin haber visto esas cartas, solo a partir de quién refutó y quién no.
+La IA dedujo la solución sin haber visto esas cartas, solo a partir de quién refutó y quién no. Y la explicación sale de un **metaintérprete** (`src/explicacion.pl`) que guarda la prueba de cada deducción, con el turno en que ocurrió cada cosa.
 
 ## Tests
 
@@ -90,7 +97,7 @@ La IA dedujo la solución sin haber visto esas cartas, solo a partir de quién r
 swipl -q -g run_tests -t halt tests/todos.pl
 ```
 
-Ejecuta los 522 tests (`tests/test_juego.pl`, `tests/test_deduccion.pl`, `tests/test_consola.pl`, `tests/test_ia.pl`, `tests/test_jugador.pl`, `tests/test_turnos.pl`, `tests/test_sherlog.pl` y `tests/test_servidor.pl`, con [plunit](https://www.swi-prolog.org/pldoc/man?section=plunit)). Muestra el progreso, marca con `FAILED` los que fallen y termina con código 0 si todos pasan o con 1 si alguno falla (se comprueba con `echo $status` en fish, o `echo $?` en bash). Tarda unos dos minutos (los tests de probabilidades y las partidas completas con la IA media son los más lentos). Los de la consola no usan el teclado: leen de un texto y escriben en otro.
+Ejecuta los 568 tests (`tests/test_juego.pl`, `tests/test_deduccion.pl`, `tests/test_consola.pl`, `tests/test_ia.pl`, `tests/test_explicacion.pl`, `tests/test_jugador.pl`, `tests/test_turnos.pl`, `tests/test_sherlog.pl` y `tests/test_servidor.pl`, con [plunit](https://www.swi-prolog.org/pldoc/man?section=plunit)). Muestra el progreso, marca con `FAILED` los que fallen y termina con código 0 si todos pasan o con 1 si alguno falla (se comprueba con `echo $status` en fish, o `echo $?` en bash). Tarda unos dos minutos (los tests de probabilidades y las partidas completas con la IA media son los más lentos). Los de la consola no usan el teclado: leen de un texto y escriben en otro.
 
 Para ejecutar solo un archivo:
 
@@ -105,6 +112,14 @@ swipl tests/dificil_vs_media.pl
 ```
 
 Juega 50 partidas de tres jugadores (una difícil y dos medias, cambiando el asiento de la difícil) y cuenta cuántas gana. Si todos jugaran igual, cada uno ganaría el 33 %. Comprueba también que la difícil nunca queda eliminada y que ninguna decisión tarda 2 s. Tarda unos dos minutos; acepta el número de partidas y una semilla: `swipl tests/dificil_vs_media.pl 20 7`.
+
+### Cobertura de la explicación
+
+```bash
+swipl tests/cobertura_explicacion.pl
+```
+
+Juega partidas con IAs media y difícil y, después de cada turno, contrasta el metaintérprete (`src/explicacion.pl`) con el motor CLP(FD): **corrección** (lo que explica nunca contradice al motor ni al sobre real: tiene que dar 0 contradicciones) y **cobertura** (qué parte de lo que el motor sabe con certeza sabe explicar). Acepta partidas y semilla: `swipl tests/cobertura_explicacion.pl 10 7`. Tarda varios minutos.
 
 ### Torneo entre niveles
 

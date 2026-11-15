@@ -47,7 +47,7 @@ jugar_una(I, r(Asiento, Ganador, Motivo, Eliminada, Tiempo, Decision)) :-
     Asiento is (I - 1) mod 3 + 1,
     findall(T, ( between(1, 3, J), ( J =:= Asiento -> T = dificil ; T = media ) ), Tipos),
     iniciar_partida(Tipos, Partida, Jugadores),
-    jugador_con_id(Asiento, Jugadores, jugador(_, dificil, mente(K, _))),
+    jugador_con_id(Asiento, Jugadores, jugador(_, dificil, mente(K, _, _))),
     statistics(cputime, T0),
     dificil_accion(K, _),                         % lo que tarda una decisión
     statistics(cputime, T1),

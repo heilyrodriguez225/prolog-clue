@@ -13,6 +13,7 @@
 :- consult(test_deduccion).
 :- consult(test_consola).
 :- consult(test_ia).
+:- consult(test_explicacion).
 :- consult(test_jugador).
 :- consult(test_turnos).
 :- consult(test_sherlog).
