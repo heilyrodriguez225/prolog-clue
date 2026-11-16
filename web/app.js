@@ -160,8 +160,22 @@ function textoEntrada(h) {
 // Una pestaña por turno. Si no has elegido ninguna, se sigue el último turno.
 let turnoElegido = null;
 
+// La rueda del ratón desplaza las pestañas en horizontal.
+let ruedaPuesta = false;
+function ruedaEnPestanas(tabs) {
+  if (ruedaPuesta) return;
+  ruedaPuesta = true;
+  tabs.addEventListener('wheel', (ev) => {
+    if (Math.abs(ev.deltaY) > Math.abs(ev.deltaX) && tabs.scrollWidth > tabs.clientWidth) {
+      tabs.scrollLeft += ev.deltaY;
+      ev.preventDefault();
+    }
+  }, { passive: false });
+}
+
 function pintarHistorial() {
   const tabs = document.getElementById('turnos-tabs');
+  ruedaEnPestanas(tabs);
   const detalle = document.getElementById('turno-detalle');
   const titulo = document.getElementById('actividad-ultimo');
   const hist = estado.historial;
