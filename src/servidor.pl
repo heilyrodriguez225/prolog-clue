@@ -46,6 +46,7 @@
 :- use_module(jugador).
 :- use_module(turnos).
 :- use_module(puente).
+:- use_module(explicacion, [registro_inicial/3, explicar_cartas/4]).
 :- use_module(sherlog, [niveles/1]).
 
 :- multifile user:file_search_path/2.
@@ -425,9 +426,11 @@ partida_completa(Id, Nombre, Niveles, Asistente, Modo) :-
     jugador_con_id(1, Jugadores0, Humano0),
     con_memoria(Humano0, web(Id, K, Modo), Humano),
     reemplazar_jugador(Jugadores0, Humano, Jugadores),
+    registro_inicial(1, Partida, Registro),
+    poner_registro(Id, Registro),
     foto_inicial(Id, Nombre, Niveles, Partida, K, Modo),
     jugar(Partida, Jugadores, [termina_si_cae(1)], Resultado),
-    publicar_fin(Id, Resultado).
+    publicar_fin(Id, Nombre, Modo, Resultado).
 
 foto_inicial(Id, Nombre, Niveles, Partida, K, Modo) :-
     Partida = partida(_, Manos, _, _, _),
@@ -450,15 +453,43 @@ foto_inicial(Id, Nombre, Niveles, Partida, K, Modo) :-
     publicar(Id, _{estado: jugando, modo: Modo, turno: 1, jugadores: [Humano|IAs], mano: Mano,
                    historial: [], pendiente: null, libreta: Libreta, fin: null, ritmo: Ritmo}).
 
-publicar_fin(Id, fin(Ganador, Motivo, Partida, _)) :-
+publicar_fin(Id, Nombre, Modo, fin(Ganador, Motivo, Partida, Jugadores)) :-
     Partida = partida(sobre(S, A, L), Manos, _, Eliminados, _),
     (   Ganador == ninguno -> Quien = null ; Quien = Ganador ),
     (   Motivo = eliminado(_) -> Texto = eliminado ; Texto = Motivo ),
     % Al terminar ya no hay nada que ocultar: se enseñan todas las manos.
     findall(_{jugador: J, cartas: Cs}, member(J-Cs, Manos), ManosFin),
+    explicacion_del_fin(Id, Nombre, Modo, Ganador, Motivo, Jugadores, [S, A, L], Explicacion),
     publicar(Id, _{estado: fin, turno: null, pendiente: null,
                    fin: _{ganador: Quien, motivo: Texto, sobre: [S, A, L],
-                          eliminados: Eliminados, manos: ManosFin}}).
+                          eliminados: Eliminados, manos: ManosFin,
+                          explicacion: Explicacion}}).
+
+%   La explicación de por qué acusó la IA que ganó (explicacion.pl), a partir
+%   de lo que ESA IA vio, con el turno de cada cosa. Solo existe cuando una IA
+%   gana acusando bien y sabe explicarse (media y difícil; y la IA que juega
+%   por ti en el modo demo). En los demás casos es null. Se calcula al final:
+%   antes de terminar la partida no hay nada que contar.
+explicacion_del_fin(Id, Nombre, Modo, Ganador, acierta, Jugadores, Sobre, Explicacion) :-
+    integer(Ganador),
+    registro_del_ganador(Id, Modo, Ganador, Jugadores, Registro),
+    !,
+    nombres_de_ias(NombresIAs),
+    findall(J-N, ( nth1(I, NombresIAs, N), J is I + 1 ), Pares0),
+    Pares = [1-Nombre|Pares0],
+    memberchk(Ganador-NombreGanador, Pares),
+    explicar_cartas(Registro, ctx(Ganador, Pares), Sobre, Textos),
+    findall(_{carta: C, texto: T}, member(C-T, Textos), Cartas),
+    Explicacion = _{quien: Ganador, nombre: NombreGanador, cartas: Cartas}.
+explicacion_del_fin(_, _, _, _, _, _, _, null).
+
+% El registro de la IA ganadora: el suyo si es media o difícil; en el modo
+% demo, el del jugador web (que es una IA media).
+registro_del_ganador(_, _, Ganador, Jugadores, Registro) :-
+    Ganador > 1,
+    memberchk(jugador(Ganador, _, mente(_, _, Registro)), Jugadores).
+registro_del_ganador(Id, espectador, 1, _, Registro) :-
+    registro_de(Id, Registro).
 
 terminar_con_error(Id, partida_abandonada) :-
     !,

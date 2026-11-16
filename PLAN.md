@@ -253,7 +253,7 @@ Los `POST` devuelven el estado enseguida; **la página consulta `GET` cada poco*
 | `historial[].carta_vista` | Solo en tus sugerencias, y solo si alguien refutó: `{"jugador": 3, "carta": "daga"}`. En las de los demás, siempre `null` |
 | `libreta[].estado` | `descartada`, `dudosa` o `sobre` (lo que dice `deducir/2`) |
 | `libreta[].probabilidad` | Porcentaje de estar en el sobre (`probabilidades/2`); solo se recalcula cuando te toca |
-| `fin` | `null` o `{"ganador": 3, "motivo": "acierta", "sobre": [...], "eliminados": [...], "manos": [{"jugador": 2, "cartas": [...]}, ...]}`. Si pierdes, `ganador` es `null` y `motivo` es `"eliminado"`. Las `manos` de todos se enseñan **solo al terminar** |
+| `fin` | `null` o `{"ganador": 3, "motivo": "acierta", "sobre": [...], "eliminados": [...], "manos": [{"jugador": 2, "cartas": [...]}, ...], "explicacion": ...}`. Si pierdes, `ganador` es `null` y `motivo` es `"eliminado"`. Las `manos` de todos se enseñan **solo al terminar**. `explicacion` es `null` o `{"quien": 3, "nombre": "Cleo", "cartas": [{"carta": "daga", "texto": "- Daga está en el sobre, porque…"}, ...]}`: por qué acusó la IA que ganó, con el turno de cada cosa que había visto. Solo existe si ganó una IA media o difícil (o, en el modo demo, la IA que juega por ti) acusando bien; no existe antes del `fin` |
 
 `nivel` es `facil`, `media` o `dificil` para las IAs, y `null` para ti. La página compone los textos ("Beto refutó") a partir de estos datos.
 

@@ -47,13 +47,15 @@
             prueba/3,
             explicar/3,
             explicar_carta/5,
-            explicar_acusacion/4
+            explicar_acusacion/4,
+            explicar_cartas/4
           ]).
 
 :- use_module(library(lists)).
 :- use_module(library(apply)).
 :- use_module(library(pairs)).
 :- use_module(library(assoc)).
+:- use_module(library(time)).
 :- use_module(juego, [carta/2, nombre/2]).
 
 % ---------------------------------------------------------------------------
@@ -288,15 +290,38 @@ meta_de_estado(descartada, C, descartada(C)).
 %   está en el sobre. Si no sabe probar alguna lo dice.
 
 explicar_acusacion(Registro, Ctx, Cartas, Texto) :-
-    maplist(explicar_una(Registro, Ctx), Cartas, Partes),
+    explicar_cartas(Registro, Ctx, Cartas, Pares),
+    pairs_values(Pares, Partes),
     atomic_list_concat(Partes, '\n\n', Atomo),
     atom_string(Atomo, Texto).
 
+%!  explicar_cartas(+Registro, +Contexto, +Cartas, -Pares) is det.
+%
+%   Pares es una lista Carta-Texto: por qué cada carta está en el sobre.
+%   Cada una tiene un límite de tiempo (2 s; el flag sherlog_limite_explicacion
+%   lo cambia): una búsqueda que no encuentra prueba puede tardar mucho, y la
+%   explicación nunca debe dejar colgada la partida.
+
+explicar_cartas(Registro, Ctx, Cartas, Pares) :-
+    findall(C-T, ( member(C, Cartas), explicar_una(Registro, Ctx, C, T) ), Pares).
+
+limite_de_explicacion(L) :-
+    (   current_prolog_flag(sherlog_limite_explicacion, L0) -> L = L0 ; L = 2.0 ).
+
 explicar_una(Registro, Ctx, Carta, Parte) :-
-    (   explicar_carta(Registro, Ctx, en_sobre, Carta, Texto)
-    ->  Parte = Texto
-    ;   nombre_de_carta(Carta, N),
-        format(atom(Parte), "No sé explicar por qué ~w está en el sobre.", [N])
+    nombre_de_carta(Carta, N),
+    limite_de_explicacion(Limite),
+    catch(( call_with_time_limit(Limite, explicar_carta(Registro, Ctx, en_sobre, Carta, Texto))
+          -> Resultado = texto(Texto)
+          ;  Resultado = sin_prueba
+          ),
+          time_limit_exceeded,
+          Resultado = tardo),
+    (   Resultado = texto(T)
+    ->  Parte = T
+    ;   Resultado == tardo
+    ->  format(atom(Parte), "No he podido explicar por qué ~w está en el sobre: tardaba demasiado.", [N])
+    ;   format(atom(Parte), "No sé explicar por qué ~w está en el sobre.", [N])
     ).
 
 % lineas(+Arbol, +Ctx, +Nivel, -Lineas)
@@ -312,7 +337,7 @@ lineas(por(sus_cartas_conocidas, conocidas(J, Cs), Pruebas), Ctx, Nivel, Lineas)
 lineas(por(nadie_la_tiene, en_sobre(C), [hecho(jugadores(N))|Pruebas]), Ctx, Nivel, Lineas) :-
     !,
     nombre_de_carta(C, Nom),
-    format(atom(F), "~w está en el sobre, porque ninguno de los ~w jugadores la tiene:", [Nom, N]),
+    format(atom(F), "~w está en el sobre, porque ninguno de los ~w jugadores tiene esa carta:", [Nom, N]),
     sangrar(Nivel, F, Linea),
     Nivel1 is Nivel + 1,
     hijos_lineas(Pruebas, Ctx, Nivel1, Sub),

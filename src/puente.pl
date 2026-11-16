@@ -27,6 +27,8 @@
             poner_retardo/1,
             poner_ritmo/2,
             ritmo_de/2,
+            poner_registro/2,
+            registro_de/2,
             web_preguntar_accion/6,
             web_preguntar_carta/5,
             web_observar/5,
@@ -39,8 +41,9 @@
 :- use_module(juego, [carta/2]).
 :- use_module(deduccion).
 :- use_module(ia, [media_observar/3, media_accion/2]).
+:- use_module(explicacion, [registrar/4]).
 
-:- dynamic foto_/3, cola_/2, retardo_/1, ritmo_/2.
+:- dynamic foto_/3, cola_/2, retardo_/1, ritmo_/2, registro_/2.
 
 retardo_(0.0).
 
@@ -67,6 +70,28 @@ poner_ritmo(Id, Segundos) :-
                ( retractall(ritmo_(Id, _)),
                  assertz(ritmo_(Id, Segundos)) )).
 
+%!  poner_registro(+Id, +Registro) is det.
+%!  registro_de(+Id, -Registro) is semidet.
+%
+%   Lo que ha visto el jugador web (explicacion.pl), con el turno de cada
+%   cosa. Son datos planos. Sirve para explicar, en el modo demo, por qué
+%   acusó la IA que juega por ti. No se publica en la foto.
+
+poner_registro(Id, Registro) :-
+    with_mutex(sherlog_puente,
+               ( retractall(registro_(Id, _)),
+                 assertz(registro_(Id, Registro)) )).
+
+registro_de(Id, Registro) :-
+    with_mutex(sherlog_puente, registro_(Id, Registro)).
+
+anotar_en_registro(Id, Yo, Evento) :-
+    (   registro_de(Id, R0)
+    ->  registrar(Yo, Evento, R0, R1),
+        poner_registro(Id, R1)
+    ;   true
+    ).
+
 ritmo_de(Id, Segundos) :-
     (   ritmo_(Id, S) -> Segundos = S ; retardo_(Segundos) ).
 
@@ -89,6 +114,7 @@ olvidar_partida(Id) :-
     with_mutex(sherlog_puente,
                ( retractall(cola_(Id, _)),
                  retractall(ritmo_(Id, _)),
+                 retractall(registro_(Id, _)),
                  retractall(foto_(Id, _, _)) )).
 
 %!  foto_actual(+Id, -Foto) is semidet.
@@ -206,6 +232,7 @@ espera_carta(Id, Candidatas, Carta) :-
 web_observar(Id, Yo, Asistente, Modo, Evento) :-
     actualizar(Id, cambios_por_evento(Evento)),
     observar_con_asistente(Id, Yo, Asistente, Evento),
+    anotar_en_registro(Id, Yo, Evento),
     pausa(Id, Yo, Modo, Evento).
 
 cambios_por_evento(sugerencia(Quien, Cartas, Respuestas), F, Cambios) :-

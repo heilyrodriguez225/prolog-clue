@@ -316,6 +316,42 @@ expl_sospechosos_menos(Ss) :-
 
 :- end_tests(texto).
 
+poner_limite(L) :- create_prolog_flag(sherlog_limite_explicacion, L, [type(term)]).
+
+:- begin_tests(explicar_cartas).
+
+test(da_un_texto_por_carta_en_el_orden_pedido) :-
+    Mias = [chef_canela, entrenador_cobalto, senora_coral, doctora_violeta, senorita_perla,
+            trofeo, veneno, daga, revolver, tijeras,
+            biblioteca, cocina, sala_de_video, piscina, comedor, estudio, bodega, jardin],
+    reg_de([ mano(1, Mias), jugadores(3), cuenta(1, 18) ], R),
+    ctx_expl(Ctx),
+    explicar_cartas(R, Ctx, [cuerda, jardinero_verde, gimnasio], Pares),
+    pairs_keys(Pares, Cs), Cs == [cuerda, jardinero_verde, gimnasio],
+    forall(member(_-T, Pares), contiene_expl(T, "está en el sobre, porque")).
+
+test(si_no_sabe_probar_una_carta_dice_que_no_sabe) :-
+    reg_tras([], R),
+    ctx_expl(Ctx),
+    explicar_cartas(R, Ctx, [cuerda], [cuerda-T]),
+    contiene_expl(T, "No sé explicar por qué Cuerda está en el sobre").
+
+% Una búsqueda lenta nunca cuelga la partida: pasado el límite se dice que tardaba demasiado.
+test(si_tarda_demasiado_lo_dice, [setup(poner_limite(0)), cleanup(poner_limite(2.0))]) :-
+    reg_de([ mano(1, [daga]), jugadores(3), cuenta(1, 1) ], R),
+    ctx_expl(Ctx),
+    explicar_cartas(R, Ctx, [cuerda], [cuerda-T]),
+    contiene_expl(T, "tardaba demasiado").
+
+test(el_limite_normal_no_estorba, [setup(poner_limite(2.0))]) :-
+    findall(C, ( carta(sospechoso, C), C \== jardinero_verde ), Ss),
+    reg_de([ mano(1, Ss), jugadores(3), cuenta(1, 5) ], R),
+    ctx_expl(Ctx),
+    explicar_cartas(R, Ctx, [jardinero_verde], [jardinero_verde-T]),
+    contiene_expl(T, "Jardinero Verde está en el sobre, porque").
+
+:- end_tests(explicar_cartas).
+
 :- begin_tests(en_los_jugadores).
 
 test(las_ias_media_y_dificil_empiezan_con_su_registro, [forall(member(Tipo, [media, dificil]))]) :-

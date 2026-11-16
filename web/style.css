@@ -560,3 +560,13 @@ button.tab-turno.sel.acusa .n { color: var(--vino); }
 .turnos-tabs::-webkit-scrollbar-track { background: #2a2238; }
 .turnos-tabs::-webkit-scrollbar-thumb { background: var(--dorado); border-radius: 4px; }
 .turno-detalle { height: 210px; overflow-y: auto; }          /* siempre del mismo tamaño */
+
+/* --- Explicación de la acusación (#24) --- */
+dialog#dialogo:has(.explicacion) { max-width: 640px; }
+dialog#dialogo h3 { margin: 14px 0 4px; font-family: var(--serif); font-size: 17px; }
+.nota-explicacion { font-size: 13px; color: var(--suave); margin: 0 0 6px; }
+pre.explicacion {
+  white-space: pre-wrap; word-break: break-word; margin: 0; padding: 10px 12px;
+  background: #fff; border: 1px solid var(--panel-borde); border-radius: 6px;
+  font: 13px/1.55 var(--sans); color: var(--tinta);
+}

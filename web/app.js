@@ -406,11 +406,7 @@ function manosEnDialogo(f) {
   return `<p class="manos-titulo">Las cartas de cada rival:</p><ul class="manos-fin">${filas}</ul>`;
 }
 
-function pintarFin() {
-  if (estado.estado !== 'fin' || !estado.fin) return;
-  if (clavePendiente === 'fin') return;
-  clavePendiente = 'fin';
-  const f = estado.fin;
+function textoDelFin(f) {
   let titulo, motivo;
   if (estado.modo === 'espectador') {
     titulo = f.ganador === 1 ? 'La IA ha ganado' : f.ganador === null ? 'La IA se ha equivocado' : `Gana ${nombreJugador(f.ganador)}`;
@@ -425,6 +421,19 @@ function pintarFin() {
     titulo = `Gana ${nombreJugador(f.ganador)}`;
     motivo = f.motivo === 'acierta' ? 'Acusó correctamente.' : 'Es el único que queda sin eliminar.';
   }
+  return { titulo, motivo };
+}
+
+// Pantalla de fin. Si ganó una IA acusando, se puede ver paso a paso por qué acusó.
+// En el modo demo la IA que gana puede ser la que juega por ti: no tiene nombre propio.
+function quienDedujo(e) {
+  return estado.modo === 'espectador' && e.quien === 1 ? 'la IA' : e.nombre;
+}
+
+function verFin() {
+  const f = estado.fin;
+  const { titulo, motivo } = textoDelFin(f);
+  const e = f.explicacion;
   abrirDialogo(`
     <h2>${esc(titulo)}</h2>
     <p>${esc(motivo)}</p>
@@ -432,10 +441,32 @@ function pintarFin() {
     ${manosEnDialogo(f)}
     <div class="botones">
       <button class="primario" id="otra">Nueva partida</button>
+      ${e ? `<button id="ver-explicacion">¿Cómo lo dedujo ${esc(quienDedujo(e))}?</button>` : ''}
       <button id="ver-mesa">Ver la mesa</button>
     </div>`);
   document.getElementById('otra').onclick = () => { location.href = 'inicio.html'; };
   document.getElementById('ver-mesa').onclick = cerrarDialogo;
+  if (e) document.getElementById('ver-explicacion').onclick = verExplicacion;
+}
+
+function verExplicacion() {
+  const e = estado.fin.explicacion;
+  const bloques = e.cartas.map((c) => `
+    <h3>${esc(nombreCarta(c.carta))}</h3>
+    <pre class="explicacion">${esc(c.texto)}</pre>`).join('');
+  abrirDialogo(`
+    <h2>Así lo dedujo ${esc(quienDedujo(e))}</h2>
+    <p class="nota-explicacion">Lo que había visto, turno a turno, y cómo llegó a cada carta del sobre.</p>
+    ${bloques}
+    <div class="botones"><button class="primario" id="volver-fin">Volver</button></div>`);
+  document.getElementById('volver-fin').onclick = verFin;
+}
+
+function pintarFin() {
+  if (estado.estado !== 'fin' || !estado.fin) return;
+  if (clavePendiente === 'fin') return;
+  clavePendiente = 'fin';
+  verFin();
 }
 
 // ---------- Consultar el estado ----------

@@ -6,7 +6,7 @@
 :- use_module(library(http/http_open)).
 :- use_module(library(http/http_json)).
 :- use_module('../src/servidor').
-:- use_module('../src/puente', [poner_retardo/1]).
+:- use_module('../src/puente', [poner_retardo/1, registrar_partida/2, publicar/2, foto_actual/2, poner_registro/2, olvidar_partida/1]).
 :- use_module('../src/juego', [carta/2]).
 
 % Espera a que la partida pida algo (o termine) y devuelve el estado.
@@ -63,6 +63,22 @@ jugar_paso_a_paso(Id, V0, Final, Ventanas) :-
     ;   random_member(C, E.pendiente.candidatas),
         api_carta(Id, _{carta: C}, _),
         jugar_paso_a_paso(Id, V0, Final, Ventanas)
+    ).
+
+% La persona solo sugiere y nunca acusa: la partida la gana una IA acusando.
+jugar_sin_acusar(Id, Final) :-
+    esperar_estado(Id, E),
+    (   E.estado == fin -> Final = E
+    ;   E.estado == error -> throw(error_en_partida(E))
+    ;   E.pendiente.tipo == accion
+    ->  findall(C, carta(sospechoso, C), Ss), findall(C, carta(arma, C), As),
+        findall(C, carta(lugar, C), Ls),
+        random_member(S, Ss), random_member(A, As), random_member(L, Ls),
+        api_accion(Id, _{tipo: sugerir, cartas: [S, A, L]}, _),
+        jugar_sin_acusar(Id, Final)
+    ;   random_member(C, E.pendiente.candidatas),
+        api_carta(Id, _{carta: C}, _),
+        jugar_sin_acusar(Id, Final)
     ).
 
 codigo(Goal, Codigo) :-
@@ -553,3 +569,123 @@ test(lo_que_no_existe_da_404) :-
     pedir(P, get, '/api/nada', none, 404, _).
 
 :- end_tests(rutas_http).
+
+:- begin_tests(explicacion_del_fin).
+
+% Gana una IA acusando: la pantalla de fin cuenta paso a paso por qué acusó.
+test(cuando_gana_una_ia_el_fin_trae_su_explicacion, [forall(member(Nivel, ["media", "dificil"]))]) :-
+    api_crear(_{nombre: "Ana", rivales: [_{nivel: Nivel}, _{nivel: "media"}], ritmo: 0}, E0),
+    jugar_sin_acusar(E0.id, F),
+    F.fin.ganador >= 2,
+    F.fin.motivo == acierta,
+    X = F.fin.explicacion,
+    X.quien =:= F.fin.ganador,
+    atomic(X.nombre),
+    length(X.cartas, 3),
+    findall(C, member(_{carta: C, texto: _}, X.cartas), Cs),
+    Cs == F.fin.sobre,                               % las tres cartas del sobre, por orden
+    forall(member(_{carta: _, texto: T}, X.cartas),
+           sub_string(T, _, _, _, "está en el sobre")),
+    api_abandonar(E0.id).
+
+test(la_explicacion_habla_de_lo_que_vio_esa_ia_con_sus_turnos) :-
+    api_crear(_{nombre: "Ana", rivales: [_{nivel: "media"}, _{nivel: "media"}], ritmo: 0}, E0),
+    jugar_sin_acusar(E0.id, F),
+    X = F.fin.explicacion,
+    findall(T, member(_{carta: _, texto: T}, X.cartas), Ts),
+    atomic_list_concat(Ts, '\n', Todo),
+    once(( sub_atom(Todo, _, _, _, 'turno') ; sub_atom(Todo, _, _, _, 'mi mano') )),
+    api_abandonar(E0.id).
+
+% Nada de esto se cuenta antes de tiempo.
+test(antes_del_fin_no_hay_explicacion) :-
+    api_crear(_{nombre: "Ana", rivales: [_{nivel: "media"}, _{nivel: "media"}], ritmo: 0}, E0),
+    esperar_estado(E0.id, E),
+    E.estado == esperando,
+    E.fin == null,
+    \+ get_dict(explicacion, E, _),
+    \+ ( get_dict(fin, E, Fin), is_dict(Fin) ),
+    api_abandonar(E0.id).
+
+test(si_la_persona_acusa_mal_no_hay_explicacion) :-
+    crear([_{nivel: "media"}, _{nivel: "media"}], Id, _),
+    esperar_estado(Id, E0),
+    findall(C, ( member(C, E0.mano) ), _),
+    api_accion(Id, _{tipo: acusar, cartas: [chef_canela, trofeo, biblioteca]}, _),
+    esperar_estado(Id, E),
+    E.estado == fin,
+    (   E.fin.ganador == null
+    ->  E.fin.explicacion == null
+    ;   true                                        % (acertó de casualidad: ganas tú)
+    ),
+    api_abandonar(Id).
+
+test(si_gana_una_ia_facil_no_hay_explicacion, [true(Todas == [null])]) :-
+    api_crear(_{nombre: "Ana", rivales: [_{nivel: "facil"}, _{nivel: "facil"}], ritmo: 0}, E0),
+    jugar_sin_acusar(E0.id, F),
+    (   F.fin.ganador >= 2 -> Todas = [F.fin.explicacion] ; Todas = [null] ),
+    api_abandonar(E0.id).
+
+% En el modo demo juega una IA por ti y también se explica su acusación.
+test(en_el_modo_demo_tambien_se_explica, [forall(between(1, 3, _)), nondet]) :-
+    api_crear(_{nombre: "Ana", rivales: [_{nivel: "media"}, _{nivel: "media"}],
+                asistente: true, modo: "espectador", ritmo: 0}, E0),
+    esperar_estado(E0.id, F),
+    F.estado == fin,
+    F.fin.motivo == acierta,
+    X = F.fin.explicacion,
+    X.quien =:= F.fin.ganador,
+    length(X.cartas, 3),
+    (   F.fin.ganador =:= 1 -> X.nombre == "Ana" ; true ),
+    % se explica con lo que la IA vio, turno a turno (también la IA que juega por ti)
+    findall(T, member(_{carta: _, texto: T}, X.cartas), Ts),
+    atomic_list_concat(Ts, '\n', Todo),
+    sub_atom(Todo, _, _, _, 'en el turno'),
+    api_abandonar(E0.id).
+
+:- end_tests(explicacion_del_fin).
+
+% El fin de una partida fabricada a mano: quién tiene explicación y quién no.
+fin_fabricado(Ganador, Motivo, TipoGanador, Modo, Fin) :-
+    Id = fabricada,
+    message_queue_create(Cola),
+    registrar_partida(Id, Cola),
+    publicar(Id, _{estado: jugando}),
+    Manos = [1-[chef_canela], 2-[trofeo], 3-[daga]],
+    Mem = mente(_, [], registro(5, [ mano(3, [daga]), jugadores(3), cuenta(1, 1), cuenta(2, 1), cuenta(3, 1),
+                                     no_pudo(2, 3, 1, [x, y, z]), no_pudo(2, 3, 2, [x, y, z]) ])),
+    (   TipoGanador == media -> Memoria = Mem ; Memoria = vistas([daga]) ),
+    Jugadores = [jugador(1, web, web(fabricada, none, Modo)),
+                 jugador(2, TipoGanador, Memoria),
+                 jugador(3, TipoGanador, Memoria)],
+    poner_registro(Id, registro(5, [ mano(1, [chef_canela]), jugadores(3), cuenta(1, 1), cuenta(2, 1), cuenta(3, 1) ])),
+    servidor:publicar_fin(Id, "Ana", Modo,
+                          fin(Ganador, Motivo, partida(sobre(senora_coral, cuerda, gimnasio), Manos, 1, [], []), Jugadores)),
+    foto_actual(Id, F),
+    Fin = F.fin,
+    olvidar_partida(Id),
+    message_queue_destroy(Cola).
+
+:- begin_tests(quien_tiene_explicacion).
+
+test(gana_una_ia_media_acusando, [nondet]) :-
+    fin_fabricado(3, acierta, media, jugar, Fin),
+    Fin.explicacion.quien =:= 3.
+
+test(si_gana_la_persona_no_hay, [true(X == null), nondet]) :-
+    fin_fabricado(1, acierta, media, jugar, Fin), X = Fin.explicacion.
+
+test(si_gana_por_ser_el_ultimo_no_hay_acusacion_que_explicar, [true(X == null), nondet]) :-
+    fin_fabricado(3, ultimo, media, jugar, Fin), X = Fin.explicacion.
+
+test(si_gana_una_ia_que_no_guarda_registro_no_hay, [true(X == null), nondet]) :-
+    fin_fabricado(3, acierta, facil, jugar, Fin), X = Fin.explicacion.
+
+test(sin_ganador_no_hay, [true(X == null), nondet]) :-
+    fin_fabricado(ninguno, eliminado(1), media, jugar, Fin), X = Fin.explicacion.
+
+test(en_demo_gana_la_ia_que_juega_por_ti, [nondet]) :-
+    fin_fabricado(1, acierta, media, espectador, Fin),
+    Fin.explicacion.quien =:= 1.
+
+:- end_tests(quien_tiene_explicacion).
