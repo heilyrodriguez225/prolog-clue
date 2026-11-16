@@ -24,7 +24,7 @@ main :-
     ;   Puerto = 8080
     ),
     (   memberchk(abierto, Argv) -> Escuchar = [escuchar(todas)] ; Escuchar = [] ),
-    poner_retardo(1.0),
+    poner_retardo(manual),
     servidor_arrancar([port(Puerto)|Escuchar]),
     format("Sherlog en http://localhost:~w/  (Ctrl-C para parar)~n", [Puerto]),
     thread_get_message(_).

@@ -39,6 +39,32 @@ jugar_al_azar(Id, Final) :-
         jugar_al_azar(Id, Final)
     ).
 
+% Como jugar_al_azar, pero en paso a paso: cuenta las ventanas "siguiente" que ha confirmado
+% y comprueba que la partida NO avanza sola mientras espera.
+jugar_paso_a_paso(Id, Final, Ventanas) :- jugar_paso_a_paso(Id, 0, Final, Ventanas).
+jugar_paso_a_paso(Id, V0, Final, Ventanas) :-
+    esperar_estado(Id, E),
+    (   E.estado == fin -> Final = E, Ventanas = V0
+    ;   E.estado == error -> throw(error_en_partida(E))
+    ;   E.pendiente.tipo == siguiente
+    ->  Entradas = E.pendiente.n,
+        length(E.historial, Largo), Largo >= Entradas,
+        sleep(0.1),                                  % nadie avanza la partida
+        api_estado(Id, -1, E2), E2.version =:= E.version,
+        api_siguiente(Id, _),
+        V1 is V0 + 1,
+        jugar_paso_a_paso(Id, V1, Final, Ventanas)
+    ;   E.pendiente.tipo == accion
+    ->  findall(C, carta(sospechoso, C), Ss), findall(C, carta(arma, C), As),
+        findall(C, carta(lugar, C), Ls),
+        random_member(S, Ss), random_member(A, As), random_member(L, Ls),
+        api_accion(Id, _{tipo: sugerir, cartas: [S, A, L]}, _),
+        jugar_paso_a_paso(Id, V0, Final, Ventanas)
+    ;   random_member(C, E.pendiente.candidatas),
+        api_carta(Id, _{carta: C}, _),
+        jugar_paso_a_paso(Id, V0, Final, Ventanas)
+    ).
+
 codigo(Goal, Codigo) :-
     catch(( call(Goal), Codigo = ninguno ), api_error(Codigo, _, _), true).
 
@@ -123,6 +149,95 @@ test(nombre_vacio_o_largo) :-
     api_abandonar(E1.id), api_abandonar(E2.id).
 
 :- end_tests(api_basica).
+
+:- begin_tests(ritmo).
+
+test(la_partida_dice_su_ritmo) :-
+    crear([_{nivel: "facil"}, _{nivel: "facil"}], Id, E),
+    number(E.ritmo),
+    api_abandonar(Id).
+
+test(se_puede_elegir_el_ritmo_al_crear) :-
+    api_crear(_{rivales: [_{nivel: "facil"}, _{nivel: "facil"}], ritmo: 0.25}, E),
+    E.ritmo =:= 0.25,
+    api_abandonar(E.id).
+
+test(se_puede_cambiar_mientras_se_juega) :-
+    crear([_{nivel: "facil"}, _{nivel: "facil"}], Id, _),
+    api_ritmo(Id, _{segundos: 4}, E),
+    E.ritmo =:= 4,
+    api_ritmo(Id, _{segundos: 0}, E2),
+    E2.ritmo =:= 0,
+    api_abandonar(Id).
+
+test(cada_partida_tiene_su_ritmo) :-
+    api_crear(_{rivales: [_{nivel: "facil"}, _{nivel: "facil"}], ritmo: 3}, A),
+    api_crear(_{rivales: [_{nivel: "facil"}, _{nivel: "facil"}], ritmo: 1}, B),
+    api_ritmo(A.id, _{segundos: 7}, A2),
+    A2.ritmo =:= 7,
+    api_estado(B.id, -1, B2),
+    B2.ritmo =:= 1,
+    api_abandonar(A.id), api_abandonar(B.id).
+
+test(ritmo_fuera_de_rango, [forall(member(R, [-1, 11, "rapido", null]))]) :-
+    crear([_{nivel: "facil"}, _{nivel: "facil"}], Id, _),
+    codigo(api_ritmo(Id, _{segundos: R}, _), C),
+    C == ritmo_invalido,
+    api_abandonar(Id).
+
+test(ritmo_invalido_al_crear, [true(C == ritmo_invalido)]) :-
+    codigo(api_crear(_{rivales: [_{nivel: "facil"}, _{nivel: "facil"}], ritmo: 99}, _), C).
+
+test(ritmo_de_una_partida_que_no_existe, [true(C == partida_no_existe)]) :-
+    codigo(api_ritmo(no_existe, _{segundos: 1}, _), C).
+
+test(el_ritmo_puede_ser_manual) :-
+    api_crear(_{rivales: [_{nivel: "facil"}, _{nivel: "facil"}], ritmo: "manual"}, E),
+    E.ritmo == manual,
+    api_ritmo(E.id, _{segundos: 2}, E2), E2.ritmo =:= 2,
+    api_ritmo(E.id, _{segundos: "manual"}, E3), E3.ritmo == manual,
+    api_abandonar(E.id).
+
+test(siguiente_sin_nada_que_confirmar, [true(C == no_esperas_siguiente)]) :-
+    crear([_{nivel: "facil"}, _{nivel: "facil"}], Id, _),
+    esperar_estado(Id, _),
+    codigo(api_siguiente(Id, _), C),
+    api_abandonar(Id).
+
+test(siguiente_de_una_partida_que_no_existe, [true(C == partida_no_existe)]) :-
+    codigo(api_siguiente(no_existe, _), C).
+
+:- end_tests(ritmo).
+
+:- begin_tests(paso_a_paso).
+
+% Cada jugada de otro sale en su ventana y la partida espera a "Siguiente".
+test(una_partida_entera_en_paso_a_paso, [forall(member(Rivales, [["facil", "facil"], ["media", "azar", "facil"]]))]) :-
+    maplist([N, _{nivel: N}]>>true, Rivales, Rs),
+    api_crear(_{rivales: Rs, ritmo: "manual"}, E0),
+    jugar_paso_a_paso(E0.id, Final, Ventanas),
+    Final.estado == fin,
+    Ventanas >= 2,                                   % tu resultado y al menos una jugada ajena
+    length(Final.fin.sobre, 3),
+    api_abandonar(E0.id).
+
+test(la_primera_ventana_es_el_resultado_de_tu_sugerencia) :-
+    api_crear(_{rivales: [_{nivel: "facil"}, _{nivel: "facil"}], ritmo: "manual"}, E0),
+    esperar_estado(E0.id, _),
+    api_accion(E0.id, _{tipo: sugerir, cartas: [chef_canela, trofeo, biblioteca]}, _),
+    esperar_estado(E0.id, E),
+    E.pendiente.tipo == siguiente,
+    E.pendiente.n =:= 1,
+    last(E.historial, U), U.quien =:= 1,
+    api_abandonar(E0.id).
+
+test(sin_paso_a_paso_no_hay_ventanas, [true(Ventanas == 0)]) :-
+    api_crear(_{rivales: [_{nivel: "facil"}, _{nivel: "facil"}], ritmo: 0}, E0),
+    jugar_al_azar(E0.id, _),
+    Ventanas = 0,
+    api_abandonar(E0.id).
+
+:- end_tests(paso_a_paso).
 
 :- begin_tests(api_errores).
 
@@ -220,7 +335,21 @@ test(acusar_mal_te_elimina_y_acaba) :-
     E.estado == fin,
     E.fin.ganador == null,
     E.fin.motivo == eliminado,
-    length(E.fin.sobre, 3).
+    length(E.fin.sobre, 3),
+    % al terminar se enseñan todas las manos: las 18 cartas repartidas más el sobre son las 21
+    length(E.fin.manos, 3),
+    findall(J, member(_{jugador: J, cartas: _}, E.fin.manos), Js), Js == [1, 2, 3],
+    once(member(_{jugador: 1, cartas: MiMano}, E.fin.manos)), MiMano == E0.mano,
+    findall(C, ( member(M, E.fin.manos), member(C, M.cartas) ), Repartidas),
+    append(Repartidas, E.fin.sobre, Todas),
+    length(Todas, 21), sort(Todas, Distintas), length(Distintas, 21).
+
+test(las_manos_no_se_cuentan_hasta_el_final) :-
+    crear([_{nivel: "facil"}, _{nivel: "facil"}], Id, _),
+    esperar_estado(Id, E),
+    E.estado \== fin,
+    E.fin == null,
+    api_abandonar(Id).
 
 test(partidas_al_azar_hasta_el_final) :-
     forall(between(1, 6, _), una_partida_al_azar).

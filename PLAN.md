@@ -75,6 +75,8 @@ src/
   servidor.pl     API HTTP/JSON (library(http)) y la página de web/
   servir.pl       el programa: swipl src/servir.pl [puerto]
 web/              página del juego (HTML, CSS, JS)
+diseno/           bocetos y láminas de las cartas (no se sirven)
+docs/capturas/    capturas de la página para el README y la defensa
 tests/            tests con plunit
 ```
 
@@ -205,6 +207,8 @@ La página y el juego hablan por HTTP con mensajes JSON. Esto es el **diseño**;
 | `GET /api/partida/{id}` | El estado actual. Con `?version=N` y sin cambios desde entonces, devuelve solo `{"version": N, "sin_cambios": true}` |
 | `POST /api/partida/{id}/accion` | Hacer tu jugada: `{"tipo": "sugerir", "cartas": ["chef_canela", "trofeo", "biblioteca"]}` o `{"tipo": "acusar", ...}` |
 | `POST /api/partida/{id}/carta` | Elegir qué carta enseñar al refutar: `{"carta": "trofeo"}` |
+| `POST /api/partida/{id}/ritmo` | Cambiar el ritmo: `{"segundos": 2.5}` (pausa tras cada jugada de otro, de 0 a 10) o `{"segundos": "manual"}` (paso a paso). También se puede dar al crear la partida (`"ritmo"`) y el estado lo devuelve en `ritmo`. Es de cada partida; por defecto, `manual` |
+| `POST /api/partida/{id}/siguiente` | En el paso a paso: has visto lo que ocurrió y la partida sigue. Solo vale cuando `pendiente.tipo` es `"siguiente"` |
 | `DELETE /api/partida/{id}` | Abandonar la partida (se detiene su hilo) |
 | `GET /` y archivos de `web/` | La página |
 
@@ -245,19 +249,19 @@ Los `POST` devuelven el estado enseguida; **la página consulta `GET` cada poco*
 |---|---|
 | `modo` | `jugar` o `espectador` (demo: la IA juega por el jugador 1) |
 | `estado` | `jugando` (juega una IA), `esperando` (te toca: mira `pendiente`) o `fin` |
-| `pendiente` | `null`; `{"tipo": "accion"}` (sugerir o acusar); o `{"tipo": "carta", "sugerencia": {"quien": 2, "cartas": [...]}, "candidatas": [...]}` (tienes que refutar) |
+| `pendiente` | `null`; `{"tipo": "accion"}` (sugerir o acusar); o `{"tipo": "carta", "sugerencia": {"quien": 2, "cartas": [...]}, "candidatas": [...]}` (tienes que refutar); o `{"tipo": "siguiente", "n": 4}` (paso a paso: enseña la entrada `n` del historial y espera a que pulses «Siguiente») |
 | `historial[].carta_vista` | Solo en tus sugerencias, y solo si alguien refutó: `{"jugador": 3, "carta": "daga"}`. En las de los demás, siempre `null` |
 | `libreta[].estado` | `descartada`, `dudosa` o `sobre` (lo que dice `deducir/2`) |
 | `libreta[].probabilidad` | Porcentaje de estar en el sobre (`probabilidades/2`); solo se recalcula cuando te toca |
-| `fin` | `null` o `{"ganador": 3, "motivo": "acierta", "sobre": [...], "eliminados": [...]}`. Si pierdes, `ganador` es `null` y `motivo` es `"eliminado"` |
+| `fin` | `null` o `{"ganador": 3, "motivo": "acierta", "sobre": [...], "eliminados": [...], "manos": [{"jugador": 2, "cartas": [...]}, ...]}`. Si pierdes, `ganador` es `null` y `motivo` es `"eliminado"`. Las `manos` de todos se enseñan **solo al terminar** |
 
 `nivel` es `facil`, `media` o `dificil` para las IAs, y `null` para ti. La página compone los textos ("Beto refutó") a partir de estos datos.
 
-**Qué no se cuenta nunca.** El sobre (hasta el `fin`), las manos de los demás, qué carta enseñó cada uno a otro jugador, y el conocimiento de las IAs. Es lo que ya garantiza el protocolo: la página recibe lo mismo que recibiría un jugador por la terminal.
+**Qué no se cuenta nunca.** El sobre y las manos de los demás (hasta el `fin`, cuando se enseñan), qué carta enseñó cada uno a otro jugador, y el conocimiento de las IAs. Es lo que ya garantiza el protocolo: la página recibe lo mismo que recibiría un jugador por la terminal.
 
 **La libreta es opcional.** Con `"asistente": false` el campo `libreta` es `null` y no se calcula nada. Con `true` (por defecto) se rellena con el conocimiento que el jugador `web` va acumulando con los mismos eventos que ve, usando el mismo motor que la IA media.
 
-**Errores.** `{"error": "codigo", "mensaje": "texto"}` con estos códigos: `partida_no_existe` (404), `rivales_invalidos` (400), `nivel_invalido` (400), `no_esperas_accion` (409), `accion_invalida` (400), `carta_invalida` (400).
+**Errores.** `{"error": "codigo", "mensaje": "texto"}` con estos códigos: `partida_no_existe` (404), `rivales_invalidos` (400), `nivel_invalido` (400), `no_esperas_accion` (409), `accion_invalida` (400), `carta_invalida` (400), `ritmo_invalido` (400), `no_esperas_siguiente` (409).
 
 **Los nombres de las IAs** (Beto, Cleo...) los pone el servidor. El nombre del humano viene en `nombre`: se recorta a 20 caracteres y, si viene vacío, es "Detective".
 

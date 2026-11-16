@@ -24,6 +24,8 @@
             api_accion/3,
             api_carta/3,
             api_abandonar/1,
+            api_ritmo/3,
+            api_siguiente/2,
             limpiar_partidas/0,
             poner_maximo_de_partidas/1,
             direccion_de_escucha/2
@@ -121,13 +123,62 @@ api_crear(Entrada, Estado) :-
     modo_de(Entrada, Asistente, Modo),
     limpiar_partidas,
     comprobar_tope_de_partidas,
+    ritmo_de_entrada(Entrada, Ritmo),
     nuevo_id(Id),
     message_queue_create(Cola),
     registrar_partida(Id, Cola),
+    (   Ritmo == none -> true ; poner_ritmo(Id, Ritmo) ),
     thread_create(correr(Id, Nombre, Niveles, Asistente, Modo), Hilo, [detached(true)]),
     get_time(Ahora),
     with_mutex(sherlog_servidor, assertz(partida_(Id, Hilo, Cola, Ahora))),
     esperar_primera_foto(Id, Estado).
+
+% El ritmo es opcional: segundos de pausa tras cada jugada de otro (0 a 10)
+% o "manual" (paso a paso: cada cosa que ocurre sale en una ventana y la
+% partida espera a que pulses "Siguiente").
+ritmo_de_entrada(Entrada, Ritmo) :-
+    (   get_dict(ritmo, Entrada, R)
+    ->  ritmo_valido(R, Ritmo)
+    ;   Ritmo = none
+    ).
+
+ritmo_valido(R, Ritmo) :-
+    (   number(R), R >= 0, R =< 10
+    ->  Ritmo = R
+    ;   ( string(R) ; atom(R) ), a_atomo(R, manual)
+    ->  Ritmo = manual
+    ;   api_error(ritmo_invalido, 400,
+                  "El ritmo son entre 0 y 10 segundos, o manual.")
+    ).
+
+%!  api_ritmo(+Id, +Entrada, -Estado) is det.
+%
+%   Cambia el ritmo de la partida mientras se juega: Entrada es
+%   {"segundos": 2.5} o {"segundos": "manual"}.
+
+api_ritmo(Id, Entrada, Estado) :-
+    existe_partida(Id),
+    tocar(Id),
+    (   get_dict(segundos, Entrada, S)
+    ->  ritmo_valido(S, Ritmo)
+    ;   api_error(ritmo_invalido, 400, "El ritmo son entre 0 y 10 segundos, o manual.")
+    ),
+    poner_ritmo(Id, Ritmo),
+    publicar(Id, _{ritmo: Ritmo}),
+    api_estado(Id, -1, Estado).
+
+%!  api_siguiente(+Id, -Estado) is det.
+%
+%   En el paso a paso: la persona ha visto lo que ocurrió y la partida sigue.
+
+api_siguiente(Id, Estado) :-
+    existe_partida(Id),
+    tocar(Id),
+    (   enviar_jugada(Id, siguiente, siguiente)
+    ->  true
+    ;   api_error(no_esperas_siguiente, 409, "Ahora no hay nada que confirmar.")
+    ),
+    foto_actual(Id, Estado).
 
 rivales_de(Entrada, Niveles) :-
     (   get_dict(rivales, Entrada, Rivales), is_list(Rivales)
@@ -391,23 +442,29 @@ foto_inicial(Id, Nombre, Niveles, Partida, K, Modo) :-
               nth1(I, CartasIAs, N) ),
             IAs),
     Humano = _{id: 1, nombre: Nombre, nivel: null, cartas: CartasHumano, eliminado: false},
+    ritmo_de(Id, Ritmo),
     (   K == none
     ->  Libreta = null
     ;   estados_de_la_libreta(K, Libreta)
     ),
     publicar(Id, _{estado: jugando, modo: Modo, turno: 1, jugadores: [Humano|IAs], mano: Mano,
-                   historial: [], pendiente: null, libreta: Libreta, fin: null}).
+                   historial: [], pendiente: null, libreta: Libreta, fin: null, ritmo: Ritmo}).
 
 publicar_fin(Id, fin(Ganador, Motivo, Partida, _)) :-
-    Partida = partida(sobre(S, A, L), _, _, Eliminados, _),
+    Partida = partida(sobre(S, A, L), Manos, _, Eliminados, _),
     (   Ganador == ninguno -> Quien = null ; Quien = Ganador ),
     (   Motivo = eliminado(_) -> Texto = eliminado ; Texto = Motivo ),
+    % Al terminar ya no hay nada que ocultar: se enseñan todas las manos.
+    findall(_{jugador: J, cartas: Cs}, member(J-Cs, Manos), ManosFin),
     publicar(Id, _{estado: fin, turno: null, pendiente: null,
                    fin: _{ganador: Quien, motivo: Texto, sobre: [S, A, L],
-                          eliminados: Eliminados}}).
+                          eliminados: Eliminados, manos: ManosFin}}).
 
 terminar_con_error(Id, partida_abandonada) :-
     !,
+    catch(publicar(Id, _{estado: abandonada, pendiente: null}), _, true).
+terminar_con_error(Id, error(existence_error(message_queue, _), _)) :-
+    !,                                  % abandonaron la partida y se borró su cola: no es un fallo
     catch(publicar(Id, _{estado: abandonada, pendiente: null}), _, true).
 terminar_con_error(Id, Error) :-
     print_message(error, error_en_partida(Id, Error)),     % el detalle, solo en el servidor
@@ -468,6 +525,15 @@ responder(post, [IdTexto, "carta"], Request, 200-Estado) :-
     atom_string(Id, IdTexto),
     leer_json(Request, Entrada),
     api_carta(Id, Entrada, Estado).
+responder(post, [IdTexto, "ritmo"], Request, 200-Estado) :-
+    !,
+    atom_string(Id, IdTexto),
+    leer_json(Request, Entrada),
+    api_ritmo(Id, Entrada, Estado).
+responder(post, [IdTexto, "siguiente"], _, 200-Estado) :-
+    !,
+    atom_string(Id, IdTexto),
+    api_siguiente(Id, Estado).
 responder(delete, [IdTexto], _, 200-_{abandonada: true}) :-
     !,
     atom_string(Id, IdTexto),

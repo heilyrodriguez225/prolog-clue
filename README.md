@@ -57,7 +57,19 @@ Sugieres: Chef Canela, Trofeo y Biblioteca.
 swipl src/servir.pl
 ```
 
-Abre http://localhost:8080. En la pantalla de inicio eliges tu nombre, de 2 a 4 rivales y **el nivel de cada uno** (por ejemplo, una difícil y dos fáciles). El servidor sirve la página de `web/` y la API JSON descrita en `PLAN.md` (§3, "La API web"). Cada partida corre en su propio hilo. Con `swipl src/servir.pl 9000` usas otro puerto. Por defecto solo se atiende a tu ordenador; con `swipl src/servir.pl 8080 abierto` también a tu red local.
+Abre http://localhost:8080. En la pantalla de inicio eliges tu nombre, de 2 a 4 rivales y **el nivel de cada uno** (por ejemplo, una difícil y dos fáciles). El servidor sirve la página de `web/` y la API JSON descrita en `PLAN.md` (§3, "La API web"). Cada partida corre en su propio hilo. Por defecto el juego va **paso a paso**: cada jugada (la tuya y la de cada IA) sale en una ventana con quién sugirió, quién no tenía ninguna carta y quién refutó, y la partida no sigue hasta que pulsas **Siguiente**. El selector **Ritmo** de la mesa lo cambia: Lento (4 s), Normal (2,5 s) o Rápido (1 s) pasan solos. Con `swipl src/servir.pl 9000` usas otro puerto. Por defecto solo se atiende a tu ordenador; con `swipl src/servir.pl 8080 abierto` también a tu red local.
+
+### Capturas
+
+| Inicio | Partida |
+|---|---|
+| ![Pantalla de inicio](docs/capturas/inicio.png) | ![Mesa con 4 rivales, libreta y mano](docs/capturas/partida.png) |
+
+| Refutar una sugerencia | En el móvil |
+|---|---|
+| ![Diálogo para elegir qué carta enseñar](docs/capturas/refutar.png) | ![La partida en una pantalla de móvil](docs/capturas/partida_movil.png) |
+
+La página se adapta a pantallas pequeñas: en el móvil la mesa, el historial y la libreta van en una columna, con la mano al final. Los bocetos de partida (`diseno/`) no forman parte de la página.
 
 La **libreta** del detective se rellena sola con lo que deduce el motor (descartadas, cartas seguras y el % de cada carta); se puede apagar al crear la partida. Marcando *Modo demo* juega la IA en tu lugar y ves su libreta pensar.
 
@@ -97,7 +109,7 @@ La IA dedujo la solución sin haber visto esas cartas, solo a partir de quién r
 swipl -q -g run_tests -t halt tests/todos.pl
 ```
 
-Ejecuta los 568 tests (`tests/test_juego.pl`, `tests/test_deduccion.pl`, `tests/test_consola.pl`, `tests/test_ia.pl`, `tests/test_explicacion.pl`, `tests/test_jugador.pl`, `tests/test_turnos.pl`, `tests/test_sherlog.pl` y `tests/test_servidor.pl`, con [plunit](https://www.swi-prolog.org/pldoc/man?section=plunit)). Muestra el progreso, marca con `FAILED` los que fallen y termina con código 0 si todos pasan o con 1 si alguno falla (se comprueba con `echo $status` en fish, o `echo $?` en bash). Tarda unos dos minutos (los tests de probabilidades y las partidas completas con la IA media son los más lentos). Los de la consola no usan el teclado: leen de un texto y escriben en otro.
+Ejecuta los 586 tests (`tests/test_juego.pl`, `tests/test_deduccion.pl`, `tests/test_consola.pl`, `tests/test_ia.pl`, `tests/test_explicacion.pl`, `tests/test_jugador.pl`, `tests/test_turnos.pl`, `tests/test_sherlog.pl` y `tests/test_servidor.pl`, con [plunit](https://www.swi-prolog.org/pldoc/man?section=plunit)). Muestra el progreso, marca con `FAILED` los que fallen y termina con código 0 si todos pasan o con 1 si alguno falla (se comprueba con `echo $status` en fish, o `echo $?` en bash). Tarda unos dos minutos (los tests de probabilidades y las partidas completas con la IA media son los más lentos). Los de la consola no usan el teclado: leen de un texto y escriben en otro.
 
 Para ejecutar solo un archivo:
 

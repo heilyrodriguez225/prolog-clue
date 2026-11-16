@@ -62,10 +62,20 @@ function carta(c, enMano) {
   return e;
 }
 
+// Al terminar la partida se enseñan las cartas de cada rival.
+function manoRevelada(id) {
+  const f = estado.fin;
+  if (estado.estado !== 'fin' || !f || !f.manos) return '';
+  const m = f.manos.find((x) => x.jugador === id);
+  if (!m) return '';
+  return `<div class="mano-revelada">${m.cartas.map((c) => `<span class="mini ${porId(c) ? porId(c).tipo : ''}">${esc(nombreCarta(c))}</span>`).join('')}</div>`;
+}
+
 function pintarMesa() {
   const ovalo = document.getElementById('mesa-ovalo');
   ovalo.querySelectorAll('.asiento').forEach((a) => a.remove());
   const ias = estado.jugadores.slice(1);
+  ovalo.dataset.rivales = ias.length;
   ias.forEach((j, i) => {
     const pos = ias.length === 2 ? ['oeste', 'este'][i] : ASIENTOS[i];
     const activo = estado.estado === 'jugando' && estado.turno === j.id;
@@ -80,9 +90,20 @@ function pintarMesa() {
         </div>
         <span class="cartas-n">${j.cartas} cartas</span>
       </div>
-      <div class="estado">${j.eliminado ? 'Eliminado' : activo ? 'Pensando…' : 'En espera'}</div>`;
+      <div class="estado">${j.eliminado ? 'Eliminado' : activo ? 'Pensando…' : 'En espera'}</div>${manoRevelada(j.id)}`;
     ovalo.appendChild(e);
   });
+}
+
+// El selector de ritmo muestra el de la partida (el más cercano de los tres).
+function pintarRitmo() {
+  const sel = document.getElementById('ritmo');
+  if (document.activeElement === sel) return;
+  if (estado.ritmo === 'manual') { sel.value = 'manual'; return; }
+  if (typeof estado.ritmo !== 'number') return;
+  const opciones = [...sel.options].filter((o) => o.value !== 'manual').map((o) => Number(o.value));
+  const cerca = opciones.reduce((a, b) => (Math.abs(b - estado.ritmo) < Math.abs(a - estado.ritmo) ? b : a));
+  sel.value = String(cerca);
 }
 
 function pintarEncabezado() {
@@ -90,11 +111,15 @@ function pintarEncabezado() {
   if (estado.estado === 'fin') texto = 'Fin de la partida';
   else if (estado.estado === 'jugando' && estado.turno === 1) texto = 'los rivales'; // el turno se actualiza con la siguiente jugada
   else texto = nombreJugador(estado.turno);
-  document.getElementById('turno-nombre').textContent = texto;
   document.getElementById('pildora-turno-nombre').textContent = texto;
   const aviso = document.getElementById('aviso-turno');
-  const tuTurno = estado.estado === 'esperando';
-  aviso.textContent = estado.modo === 'espectador' && estado.estado !== 'fin' ? 'Modo demo: observas pensar a la IA.'
+  const p = estado.pendiente;
+  const tuTurno = estado.estado === 'esperando' && p && p.tipo === 'accion';
+  const refutas = estado.estado === 'esperando' && p && p.tipo === 'carta';
+  const siguiente = estado.estado === 'esperando' && p && p.tipo === 'siguiente';
+  aviso.textContent = siguiente ? 'Pulsa «Siguiente» para continuar.'
+    : estado.modo === 'espectador' && estado.estado !== 'fin' ? 'Modo demo: observas pensar a la IA.'
+    : refutas ? 'Tienes que refutar: elige una carta.'
     : tuTurno ? 'Es tu turno: sugiere o acusa.' : estado.estado === 'fin' ? '' : 'Esperando a los demás…';
   aviso.classList.toggle('tu-turno', tuTurno);
 }
@@ -108,35 +133,60 @@ function pintarMano() {
 
 // ---------- Historial ----------
 
-function resultadoSugerencia(h) {
+// Quién respondió a una sugerencia, turno a turno: quién no tenía nada y quién refutó.
+// La carta concreta solo se ve si te la enseñaron a ti (las demás son privadas hasta el final).
+function detalleSugerencia(h) {
+  const sin = h.respuestas.filter((r) => r.resultado === 'no_pudo').map((r) => nombreJugador(r.jugador));
   const refuto = h.respuestas.find((r) => r.resultado === 'refuto');
-  if (!refuto) return 'Nadie pudo refutar';
-  if (refuto.jugador === 1) return 'Tú refutaste';
-  let t = `${nombreJugador(refuto.jugador)} refutó`;
-  if (h.carta_vista) t += ` · te enseñó ${nombreCarta(h.carta_vista.carta)}`;
-  return t;
+  const partes = [];
+  if (sin.length) partes.push(`sin cartas para refutar: ${sin.join(', ')}`);
+  if (!refuto) partes.push('nadie pudo refutar');
+  else if (refuto.jugador === 1) partes.push('Tú refutaste');
+  else {
+    let t = `${nombreJugador(refuto.jugador)} refutó`;
+    if (h.carta_vista) t += ` y te enseñó ${nombreCarta(h.carta_vista.carta)}`;
+    else t += ' (carta en privado)';
+    partes.push(t);
+  }
+  return partes.join(' · ');
 }
 
 function textoEntrada(h) {
-  if (h.tipo === 'sugerencia') return { texto: `Sugiere: ${nombresCartas(h.cartas)}`, res: resultadoSugerencia(h) };
+  if (h.tipo === 'sugerencia') return { texto: `sugiere ${nombresCartas(h.cartas)}`, res: detalleSugerencia(h) };
   const quien = h.quien === 1 ? 'Tú' : nombreJugador(h.quien);
-  return { texto: `Acusa: ${nombresCartas(h.cartas)}`, res: h.resultado === 'acierta' ? '¡Acertó!' : `${quien} falló y queda eliminado` };
+  return { texto: `acusa ${nombresCartas(h.cartas)}`, res: h.resultado === 'acierta' ? '¡Acertó!' : `${quien} falló y queda eliminado` };
 }
 
+// Una pestaña por turno. Si no has elegido ninguna, se sigue el último turno.
+let turnoElegido = null;
+
 function pintarHistorial() {
-  const ol = document.getElementById('historial');
-  ol.innerHTML = '';
-  const ultimo = document.getElementById('actividad-ultimo');
-  if (estado.historial.length === 0) {
-    ultimo.textContent = 'Todavía no ha pasado nada';
+  const tabs = document.getElementById('turnos-tabs');
+  const detalle = document.getElementById('turno-detalle');
+  const titulo = document.getElementById('actividad-ultimo');
+  const hist = estado.historial;
+  tabs.innerHTML = '';
+  if (hist.length === 0) {
+    titulo.textContent = 'Todavía no ha pasado nada';
+    detalle.innerHTML = '';
     return;
   }
-  const u = estado.historial[estado.historial.length - 1];
-  ultimo.innerHTML = `<strong>${esc(nombreJugador(u.quien))}</strong> — ${esc(textoEntrada(u).res.toLowerCase())}`;
-  for (const h of [...estado.historial].reverse()) {
-    const { texto, res } = textoEntrada(h);
-    ol.append(el('li', '', `<span class="quien">${esc(nombreJugador(h.quien))}</span>: ${esc(texto)}<span class="res">${esc(res)}</span>`));
+  titulo.textContent = `Historial · ${hist.length} ${hist.length === 1 ? 'turno' : 'turnos'}`;
+  const ultimo = hist[hist.length - 1].n;
+  const sel = turnoElegido !== null && turnoElegido < ultimo ? turnoElegido : ultimo;
+  for (const h of hist) {
+    const b = el('button', `tab-turno${h.n === sel ? ' sel' : ''}${h.tipo === 'acusacion' ? ' acusa' : ''}`,
+                 `<span class="n">${h.n}</span><span class="q">${esc(nombreJugador(h.quien))}</span>`);
+    b.type = 'button';
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-selected', String(h.n === sel));
+    b.title = `Turno ${h.n}`;
+    b.onclick = () => { turnoElegido = h.n === ultimo ? null : h.n; pintarHistorial(); };
+    tabs.append(b);
   }
+  detalle.innerHTML = ventanaSiguiente(sel);
+  const activa = tabs.querySelector('.sel');
+  if (activa) activa.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
 // ---------- Libreta (la asistida completa es la #20) ----------
@@ -242,7 +292,67 @@ function cerrarDialogo() {
   if (d.open) d.close();
 }
 
+// Paso a paso: cada cosa que ocurre sale en su ventana y la partida espera.
+function textoRespuestas(h) {
+  return h.respuestas.map((r) => {
+    const quien = nombreJugador(r.jugador);
+    if (r.resultado === 'no_pudo') return `<li class="no">✗ <strong>${esc(quien)}</strong> no ${r.jugador === 1 ? 'tienes' : 'tiene'} ninguna de las tres cartas</li>`;
+    if (r.jugador === 1) return `<li class="si">✓ <strong>Tú</strong> refutaste enseñando una carta</li>`;
+    const vista = h.carta_vista ? ` y te enseñó <strong>${esc(nombreCarta(h.carta_vista.carta))}</strong>` : ' (la carta es privada)';
+    return `<li class="si">✓ <strong>${esc(quien)}</strong> refutó${vista}</li>`;
+  }).join('');
+}
+
+function ventanaSiguiente(n) {
+  const h = estado.historial.find((x) => x.n === n);
+  if (!h) return '<h2>…</h2>';
+  if (h.tipo === 'sugerencia') {
+    const nadie = !h.respuestas.some((r) => r.resultado === 'refuto');
+    return `
+      <p class="turno-ventana">Turno ${h.n}</p>
+      <h2>${esc(nombreJugador(h.quien))} sugiere</h2>
+      <p class="cartas-ventana">${esc(nombresCartas(h.cartas))}</p>
+      <ul class="respuestas">${textoRespuestas(h)}${nadie ? '<li class="no">Nadie pudo refutar</li>' : ''}</ul>`;
+  }
+  const quien = nombreJugador(h.quien);
+  const res = h.resultado === 'acierta' ? '¡Acertó!' : `${quien} se equivocó y queda eliminado`;
+  return `
+    <p class="turno-ventana">Turno ${h.n}</p>
+    <h2>${esc(quien)} acusa</h2>
+    <p class="cartas-ventana">${esc(nombresCartas(h.cartas))}</p>
+    <p class="res-acusacion">${esc(res)}</p>`;
+}
+
+function pintarSiguiente() {
+  const p = estado.pendiente;
+  const abierta = clavePendiente && clavePendiente.startsWith('sig');
+  if (estado.estado === 'fin' || !p || p.tipo !== 'siguiente') {
+    if (abierta) { cerrarDialogo(); clavePendiente = null; }
+    return false;
+  }
+  const clave = `sig${p.n}`;
+  if (clavePendiente === clave) return true;               // ya está abierta
+  clavePendiente = clave;
+  abrirDialogo(`${ventanaSiguiente(p.n)}
+    <div class="botones"><button class="primario" id="siguiente">Siguiente ›</button></div>`);
+  const b = document.getElementById('siguiente');
+  b.focus();
+  b.onclick = async () => {
+    b.disabled = true;
+    try {
+      await api('POST', `/api/partida/${ID}/siguiente`);
+    } catch (e) {
+      if (e.estado !== 409) alert(e.message);               // 409: ya se había dado
+    }
+    clavePendiente = null;
+    cerrarDialogo();
+    await consultar(true);
+  };
+  return true;
+}
+
 function pintarPendiente() {
+  if (pintarSiguiente()) return;
   const p = estado.pendiente;
   if (estado.estado === 'fin' || !p || p.tipo !== 'carta') {
     if (clavePendiente && clavePendiente.startsWith('carta')) cerrarDialogo();
@@ -272,6 +382,16 @@ function pintarPendiente() {
   });
 }
 
+function manosEnDialogo(f) {
+  if (!f.manos) return '';
+  const filas = f.manos.filter((m) => m.jugador !== 1).map((m) => {
+    const ia = estado.jugadores.find((x) => x.id === m.jugador);
+    const quien = ia ? `${ia.nombre} (${NIVELES[ia.nivel] ?? ia.nivel})` : nombreJugador(m.jugador);
+    return `<li><strong>${esc(quien)}</strong>: ${esc(nombresCartas(m.cartas))}</li>`;
+  }).join('');
+  return `<p class="manos-titulo">Las cartas de cada rival:</p><ul class="manos-fin">${filas}</ul>`;
+}
+
 function pintarFin() {
   if (estado.estado !== 'fin' || !estado.fin) return;
   if (clavePendiente === 'fin') return;
@@ -295,6 +415,7 @@ function pintarFin() {
     <h2>${esc(titulo)}</h2>
     <p>${esc(motivo)}</p>
     <p>El sobre era: <strong>${esc(nombresCartas(f.sobre))}</strong>.</p>
+    ${manosEnDialogo(f)}
     <div class="botones">
       <button class="primario" id="otra">Nueva partida</button>
       <button id="ver-mesa">Ver la mesa</button>
@@ -307,6 +428,7 @@ function pintarFin() {
 
 function pintar() {
   pintarEncabezado();
+  pintarRitmo();
   pintarMesa();
   pintarMano();
   pintarHistorial();
@@ -341,11 +463,16 @@ function conectar() {
   }));
   const panel = document.getElementById('panel-sugerencia');
   document.getElementById('boton-sugerir').addEventListener('click', () => { panel.hidden = !panel.hidden; });
+  document.getElementById('ritmo').addEventListener('change', async (ev) => {
+    const v = ev.target.value;
+    try { await api('POST', `/api/partida/${ID}/ritmo`, { segundos: v === 'manual' ? 'manual' : Number(v) }); }
+    catch (e) { alert(e.message); }
+  });
   document.getElementById('enviar-sugerencia').addEventListener('click', () => enviarAccion('sugerir'));
   document.getElementById('enviar-acusacion').addEventListener('click', confirmarAcusacion);
   document.getElementById('dialogo').addEventListener('cancel', (ev) => {
     // Con Esc no se puede saltar la obligación de refutar.
-    if (estado && estado.pendiente && estado.pendiente.tipo === 'carta') ev.preventDefault();
+    if (estado && estado.pendiente && ['carta', 'siguiente'].includes(estado.pendiente.tipo)) ev.preventDefault();
   });
 }
 

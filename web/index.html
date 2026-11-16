@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sherlog</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=42">
 </head>
 <body>
 <header class="barra">
@@ -15,7 +15,6 @@
       <span class="lema">Deducción entre detectives</span>
     </span>
   </a>
-  <span class="turno">Turno: <strong id="turno-nombre">…</strong></span>
 </header>
 
 <main class="juego">
@@ -25,7 +24,17 @@
         <span class="etiqueta">Mesa de investigación</span>
         <h1>¿Quién oculta la verdad?</h1>
       </div>
-      <span class="pildora-turno"><i class="punto"></i> Turno de <strong id="pildora-turno-nombre">Tú</strong></span>
+      <div class="mesa-controles">
+        <label class="ritmo" title="Paso a paso: cada jugada sale en una ventana y esperas a pulsar Siguiente. Los demás ritmos pasan solos.">Ritmo
+          <select id="ritmo">
+            <option value="manual">Paso a paso</option>
+            <option value="4">Lento</option>
+            <option value="2.5">Normal</option>
+            <option value="1">Rápido</option>
+          </select>
+        </label>
+        <span class="pildora-turno"><i class="punto"></i> Turno de <strong id="pildora-turno-nombre">Tú</strong></span>
+      </div>
     </div>
 
     <div class="mesa-ovalo" id="mesa-ovalo">
@@ -37,13 +46,11 @@
       </div>
     </div>
 
-    <details class="actividad">
-      <summary>
-        👁 <span id="actividad-ultimo">Cargando…</span>
-        <span class="mas">⋯ ver historial</span>
-      </summary>
-      <ol id="historial"></ol>
-    </details>
+    <section class="actividad turnos" aria-label="Historial por turnos">
+      <div class="turnos-cab">👁 <span id="actividad-ultimo">Cargando…</span></div>
+      <div class="turnos-tabs" id="turnos-tabs" role="tablist"></div>
+      <div class="turno-detalle" id="turno-detalle" role="tabpanel"></div>
+    </section>
 
     <div class="mano-seccion">
       <div class="mano-encabezado">
@@ -105,6 +112,6 @@
 
 <dialog id="dialogo"></dialog>
 
-<script src="app.js"></script>
+<script src="app.js?v=42"></script>
 </body>
 </html>

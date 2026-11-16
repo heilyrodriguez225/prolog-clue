@@ -25,6 +25,8 @@
             publicar/2,
             actualizar_libreta/2,
             poner_retardo/1,
+            poner_ritmo/2,
+            ritmo_de/2,
             web_preguntar_accion/6,
             web_preguntar_carta/5,
             web_observar/5,
@@ -38,18 +40,35 @@
 :- use_module(deduccion).
 :- use_module(ia, [media_observar/3, media_accion/2]).
 
-:- dynamic foto_/3, cola_/2, retardo_/1.
+:- dynamic foto_/3, cola_/2, retardo_/1, ritmo_/2.
 
 retardo_(0.0).
 
 %!  poner_retardo(+Segundos) is det.
 %
 %   Pausa tras cada jugada de otro jugador, para que la página pueda
-%   seguir lo que ocurre. Con 0 (por defecto) no hay pausa.
+%   seguir lo que ocurre. Con 0 (por defecto) no hay pausa. Con el átomo
+%   manual no pasa nada hasta que la persona pulsa "Siguiente".
 
 poner_retardo(Segundos) :-
     retractall(retardo_(_)),
     assertz(retardo_(Segundos)).
+
+%!  poner_ritmo(+Id, +Segundos) is det.
+%!  ritmo_de(+Id, -Segundos) is det.
+%
+%   El ritmo de una partida: segundos de pausa tras cada jugada de otro
+%   jugador, o manual (paso a paso: la partida espera a que la persona
+%   pulse "Siguiente"). Es de cada partida y se puede cambiar mientras se
+%   juega. Si la partida no tiene el suyo, vale el retardo general.
+
+poner_ritmo(Id, Segundos) :-
+    with_mutex(sherlog_puente,
+               ( retractall(ritmo_(Id, _)),
+                 assertz(ritmo_(Id, Segundos)) )).
+
+ritmo_de(Id, Segundos) :-
+    (   ritmo_(Id, S) -> Segundos = S ; retardo_(Segundos) ).
 
 %   ---------------------------------------------------------------------
 %   La foto y la cola de cada partida
@@ -69,6 +88,7 @@ registrar_partida(Id, Cola) :-
 olvidar_partida(Id) :-
     with_mutex(sherlog_puente,
                ( retractall(cola_(Id, _)),
+                 retractall(ritmo_(Id, _)),
                  retractall(foto_(Id, _, _)) )).
 
 %!  foto_actual(+Id, -Foto) is semidet.
@@ -133,7 +153,7 @@ web_preguntar_accion(Id, Yo, Asistente, espectador, Vista, Accion) :-
     calcular_porcentajes(Id, Asistente),
     publicar(Id, _{turno: Yo, mano: Mano}),
     media_accion(Asistente, Accion),
-    pausar_un_poco.
+    pausar_un_poco(Id).
 web_preguntar_accion(Id, Yo, Asistente, jugar, Vista, Accion) :-
     Vista = vista(Mano, _, _),
     calcular_porcentajes(Id, Asistente),
@@ -183,10 +203,10 @@ espera_carta(Id, Candidatas, Carta) :-
 %   se lo cuenta a su asistente (si lo tiene) y hace una pausa si lo ha
 %   hecho otro jugador.
 
-web_observar(Id, Yo, Asistente, _Modo, Evento) :-
+web_observar(Id, Yo, Asistente, Modo, Evento) :-
     actualizar(Id, cambios_por_evento(Evento)),
     observar_con_asistente(Id, Yo, Asistente, Evento),
-    pausa(Yo, Evento).
+    pausa(Id, Yo, Modo, Evento).
 
 cambios_por_evento(sugerencia(Quien, Cartas, Respuestas), F, Cambios) :-
     !,
@@ -248,19 +268,56 @@ siguiente_turno(Jugadores, Quien, Turno) :-
     ;   Turno = Quien
     ).
 
-pausar_un_poco :-
-    retardo_(Segundos),
-    (   Segundos > 0 -> sleep(Segundos) ; true ).
+% La pausa de la IA en el modo demo (sin evento): solo con ritmo en segundos.
+pausar_un_poco(Id) :-
+    ritmo_de(Id, Ritmo),
+    (   number(Ritmo), Ritmo > 0 -> sleep(Ritmo) ; true ).
 
-pausa(Yo, Evento) :-
-    retardo_(Segundos),
-    (   Segundos > 0,
-        arg(1, Evento, Quien),
-        integer(Quien),
-        Quien \== Yo,
-        memberchk(Evento, [sugerencia(_, _, _), acusacion(_, _, _)])
-    ->  sleep(Segundos)
+%   Tras un evento que la persona tiene que ver: o se espera el tiempo del
+%   ritmo, o (paso a paso) se espera a que pulse "Siguiente".
+pausa(Id, Yo, Modo, Evento) :-
+    ritmo_de(Id, Ritmo),
+    (   Ritmo == manual
+    ->  (   pausa_manual(Yo, Modo, Evento) -> esperar_siguiente(Id) ; true )
+    ;   number(Ritmo), Ritmo > 0, pausa_de_otro(Yo, Evento)
+    ->  sleep(Ritmo)
     ;   true
+    ).
+
+% Con el ritmo en segundos solo se espera tras lo que hacen los demás.
+pausa_de_otro(Yo, Evento) :-
+    arg(1, Evento, Quien),
+    integer(Quien),
+    Quien \== Yo,
+    memberchk(Evento, [sugerencia(_, _, _), acusacion(_, _, _)]).
+
+% Paso a paso, hay una ventana por cada cosa que ocurre:
+%   - la sugerencia de otro;
+%   - el resultado de la tuya: al enseñarte la carta, o si nadie pudo refutar;
+%   - la acusación de otro.
+pausa_manual(Yo, _, sugerencia(Quien, _, Respuestas)) :-
+    (   Quien \== Yo -> true
+    ;   \+ memberchk(refuto(_), Respuestas)
+    ).
+pausa_manual(_, _, carta_vista(_, _)).
+pausa_manual(Yo, Modo, acusacion(Quien, _, _)) :-
+    (   Quien \== Yo -> true ; Modo == espectador ).
+
+% La foto avisa de que se espera "Siguiente"; n es la entrada del historial
+% que hay que enseñar.
+esperar_siguiente(Id) :-
+    actualizar(Id, pendiente_siguiente),
+    espera_siguiente(Id).
+
+pendiente_siguiente(F, _{estado: esperando, pendiente: _{tipo: siguiente, n: N}}) :-
+    get_dict(historial, F, Historial),
+    length(Historial, N).
+
+espera_siguiente(Id) :-
+    esperar(Id, Mensaje),
+    (   Mensaje == siguiente
+    ->  true
+    ;   espera_siguiente(Id)
     ).
 
 %   ---------------------------------------------------------------------
