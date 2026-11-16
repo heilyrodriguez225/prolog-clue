@@ -238,7 +238,7 @@ expl_cartas_menos(Tipo, Carta, Cs) :-
 
 :- end_tests(prueba).
 
-:- begin_tests(texto).
+:- begin_tests(texto_explicacion).
 
 test(explica_una_carta_descartada_citando_el_turno_y_los_nombres) :-
     reg_tras([ sugerencia(2, [a1, a2, a3], []),
@@ -314,7 +314,7 @@ test(explica_el_conteo_de_cartas_conocidas, [nondet]) :-
 expl_sospechosos_menos(Ss) :-
     findall(C, ( carta(sospechoso, C), C \== jardinero_verde ), Ss).
 
-:- end_tests(texto).
+:- end_tests(texto_explicacion).
 
 poner_limite(L) :- create_prolog_flag(sherlog_limite_explicacion, L, [type(term)]).
 

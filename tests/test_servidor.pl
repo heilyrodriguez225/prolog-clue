@@ -332,7 +332,11 @@ test(sugerir_y_ver_la_carta_que_te_ensenan) :-
     esperar_estado(Id, E),
     E.historial = [Primera|_],
     Primera.quien == 1,
-    Primera.carta_vista \== null,
+    % si alguien refutó, te enseñó una carta (con mala suerte las tres pueden ser del sobre y nadie refuta)
+    (   member(R, Primera.respuestas), R.resultado == refuto
+    ->  Primera.carta_vista \== null
+    ;   true
+    ),
     api_abandonar(Id).
 
 test(acusar_mal_te_elimina_y_acaba) :-

@@ -109,7 +109,7 @@ La IA dedujo la solución sin haber visto esas cartas, solo a partir de quién r
 swipl -q -g run_tests -t halt tests/todos.pl
 ```
 
-Ejecuta los 605 tests (`tests/test_juego.pl`, `tests/test_deduccion.pl`, `tests/test_consola.pl`, `tests/test_ia.pl`, `tests/test_explicacion.pl`, `tests/test_jugador.pl`, `tests/test_turnos.pl`, `tests/test_sherlog.pl` y `tests/test_servidor.pl`, con [plunit](https://www.swi-prolog.org/pldoc/man?section=plunit)). Muestra el progreso, marca con `FAILED` los que fallen y termina con código 0 si todos pasan o con 1 si alguno falla (se comprueba con `echo $status` en fish, o `echo $?` en bash). Tarda unos dos minutos (los tests de probabilidades y las partidas completas con la IA media son los más lentos). Los de la consola no usan el teclado: leen de un texto y escriben en otro.
+Ejecuta los 614 tests (`tests/test_juego.pl`, `tests/test_deduccion.pl`, `tests/test_consola.pl`, `tests/test_ia.pl`, `tests/test_explicacion.pl`, `tests/test_jugador.pl`, `tests/test_turnos.pl`, `tests/test_sherlog.pl` y `tests/test_servidor.pl`, con [plunit](https://www.swi-prolog.org/pldoc/man?section=plunit)). Muestra el progreso, marca con `FAILED` los que fallen y termina con código 0 si todos pasan o con 1 si alguno falla (se comprueba con `echo $status` en fish, o `echo $?` en bash). Tarda unos dos minutos (los tests de probabilidades y las partidas completas con la IA media son los más lentos). Los de la consola no usan el teclado: leen de un texto y escriben en otro.
 
 Para ejecutar solo un archivo:
 

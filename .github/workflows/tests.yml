@@ -13,6 +13,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Tests
-        run: swipl -q -g run_tests -t halt tests/todos.pl
+        shell: bash
+        run: |
+          set -o pipefail
+          swipl -q -g run_tests -t halt tests/todos.pl 2>&1 | tee tests.log
+          # Un grupo de tests mal cargado (p. ej. con el nombre de otro) solo da un aviso y los
+          # tests no se ejecutan: se trata como fallo.
+          if grep -qE "No permission to redefine module|PL-Unit: cannot|not together" tests.log; then
+            echo "::error::Hay tests que no se han cargado bien"; exit 1
+          fi
       - name: Partidas largas entre IAs
         run: swipl tests/partidas_largas.pl
