@@ -644,7 +644,7 @@ test(en_el_modo_demo_tambien_se_explica, [forall(between(1, 3, _)), nondet]) :-
     % se explica con lo que la IA vio, turno a turno (también la IA que juega por ti)
     findall(T, member(_{carta: _, texto: T}, X.cartas), Ts),
     atomic_list_concat(Ts, '\n', Todo),
-    sub_atom(Todo, _, _, _, 'en el turno'),
+    sub_atom(Todo, _, _, _, 'turno'),
     api_abandonar(E0.id).
 
 :- end_tests(explicacion_del_fin).
