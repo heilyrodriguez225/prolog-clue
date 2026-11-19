@@ -10,6 +10,9 @@
         swipl tests/torneo.pl 20 7 serie        sin paralelismo (un solo hilo)
         swipl tests/torneo.pl 20 7 4            con 4 hilos
         swipl tests/torneo.pl 20 7 4 /tmp/res   y los resultados en otra carpeta
+        swipl tests/torneo.pl 300 2026 12 /tmp/res media+media+dificil
+                                                solo esa combinación (más partidas
+                                                de una sola para ver mejoras pequeñas)
 
     Qué juega: todas las combinaciones de 3 niveles (azar, facil, media y
     dificil, con repetición): son 20. En cada combinación se juegan N
@@ -46,8 +49,10 @@
 niveles([azar, facil, media, dificil]).
 
 main(Argumentos) :-
-    argumentos(Argumentos, N, Semilla, Hilos, Carpeta),
-    findall(C, combinacion(C), Combinaciones),
+    experimento_desde_el_entorno,
+    argumentos(Argumentos, N, Semilla, Hilos, Carpeta, Solo),
+    findall(C, combinacion(C), Todas),
+    filtrar(Solo, Todas, Combinaciones),
     length(Combinaciones, NC),
     format("Sherlog: torneo, ~w combinaciones x ~w partidas (semilla ~w, ~w hilo(s))~n",
            [NC, N, Semilla, Hilos]),
@@ -69,14 +74,24 @@ main(Argumentos) :-
     format("Partidas con error: ~w~n", [Errores]),
     (   Errores =:= 0 -> halt(0) ; halt(1) ).
 
-argumentos(Args, N, Semilla, Hilos, Carpeta) :-
+argumentos(Args, N, Semilla, Hilos, Carpeta, Solo) :-
     (   Args = [A|_] -> atom_number(A, N) ; N = 100 ),
     (   Args = [_, B|_] -> atom_number(B, Semilla) ; Semilla = 2026 ),
     (   Args = [_, _, H|_]
     ->  (   H == serie -> Hilos = 1 ; atom_number(H, Hilos) )
     ;   current_prolog_flag(cpu_count, Hilos0), Hilos is max(1, Hilos0)
     ),
-    (   Args = [_, _, _, D|_] -> Carpeta = D ; Carpeta = resultados ).
+    (   Args = [_, _, _, D|_] -> Carpeta = D ; Carpeta = resultados ),
+    (   Args = [_, _, _, _, S|_] -> Solo = S ; Solo = todas ).
+
+% Con una combinación como "media+media+dificil" se juega solo esa.
+filtrar(todas, Todas, Todas) :- !.
+filtrar(Nombre, Todas, [C]) :-
+    (   member(C, Todas), nombre_combinacion(C, Nom), Nom == Nombre
+    ->  true
+    ;   format(user_error, "Combinación desconocida: ~w (ejemplo: media+media+dificil)~n", [Nombre]),
+        halt(2)
+    ).
 
 % Los multiconjuntos de 3 niveles, siempre en el mismo orden.
 combinacion([A, B, C]) :-
@@ -236,3 +251,21 @@ detalle(S, Combinaciones, Resultados, Filas) :-
              num(TP, TPs), num(TS, TSs),
              format(S, "| ~w | ~w | ~w | ~w de ~w | ~1f % | ~1f % | ~s | ~s |~n",
                     [Nom, Nivel, K, V, N, PV, PE, TPs, TSs]) )).
+
+% Experimentos de la IA difícil (issue #32), sin tocar el código:
+%   SHERLOG_UMBRAL=0.8 swipl tests/torneo.pl ...
+experimento_desde_el_entorno :-
+    (   getenv('SHERLOG_UMBRAL', U), atom_number(U, N)
+    ->  create_prolog_flag(sherlog_umbral, N, [type(float)]),
+        format("Experimento: la difícil acusa con probabilidad >= ~w~n", [N])
+    ;   true
+    ),
+    (   getenv('SHERLOG_MUESTRAS', M), atom_number(M, NM)
+    ->  create_prolog_flag(sherlog_muestras, NM, [type(integer)])
+    ;   true
+    ),
+    (   getenv('SHERLOG_OBJETIVO', O)
+    ->  create_prolog_flag(sherlog_objetivo, O, [type(atom)]),
+        format("Experimento: la difícil minimiza ~w~n", [O])
+    ;   true
+    ).

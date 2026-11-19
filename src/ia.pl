@@ -235,7 +235,10 @@ media_carta_a_mostrar(Mostradas, Quien, Candidatas, Carta, Mostradas1) :-
 %   Elige la sugerencia con la incertidumbre esperada menor.
 %
 %   Opciones: muestras(N) mundos a muestrear (200), max_candidatas(N)
-%   sugerencias a evaluar como mucho (60) y con_mano(Bool) para incluir
+%   sugerencias a evaluar como mucho (60), umbral(P) para acusar sin
+%   certeza cuando el sobre más probable llega a la probabilidad P (por
+%   defecto nunca; también se puede fijar con el flag sherlog_umbral)
+%   y con_mano(Bool) para incluir
 %   también cartas de su mano como candidatas (false).
 
 dificil_accion(K, Accion) :-
@@ -254,8 +257,9 @@ avisar_y_fallar(Error) :-
     print_message(warning, format("IA difícil: ~p. Juega como la media esta vez.", [Error])),
     fail.
 
-mejor_sugerencia(K, Opciones, sugerir(S, A, L)) :-
-    option(muestras(Muestras), Opciones, 200),
+mejor_sugerencia(K, Opciones, Accion) :-
+    (   current_prolog_flag(sherlog_muestras, M0) -> true ; M0 = 200 ),
+    option(muestras(Muestras), Opciones, M0),
     option(max_candidatas(Max), Opciones, 150),
     option(con_mano(ConMano), Opciones, true),
     K = conocimiento(Yo, P),
@@ -264,11 +268,33 @@ mejor_sugerencia(K, Opciones, sugerir(S, A, L)) :-
     numero_de_jugadores(P, N),
     orden_de_consulta(Yo, N, Orden),
     maplist(mundo_con_sobre(Cartas), Mundos, Datos),
-    findall(Puntos-Candidata,
-            ( member(Candidata, Candidatas),
-              entropia_esperada(Candidata, Cartas, Orden, Datos, Puntos) ),
-            Evaluadas),
-    keysort(Evaluadas, [_-sugerencia(S, A, L)|_]).
+    (   umbral_de(Opciones, Umbral),
+        sobre_probable(Datos, Umbral, sobre(S0, A0, L0))
+    ->  Accion = acusar(S0, A0, L0)
+    ;   findall(Puntos-Candidata,
+                ( member(Candidata, Candidatas),
+                  entropia_esperada(Candidata, Cartas, Orden, Datos, Puntos) ),
+                Evaluadas),
+        keysort(Evaluadas, [_-sugerencia(S, A, L)|_]),
+        Accion = sugerir(S, A, L)
+    ).
+
+% El umbral de riesgo es opcional: sin él la difícil solo acusa con certeza.
+umbral_de(Opciones, Umbral) :-
+    (   option(umbral(U), Opciones) -> Umbral = U
+    ;   current_prolog_flag(sherlog_umbral, Umbral)
+    ).
+
+%   Acusar con riesgo (issue #32). El sobre más repetido entre
+%   los mundos mirados, si aparece en una fracción >= Umbral de ellos.
+sobre_probable(Datos, Umbral, sobre(S, A, L)) :-
+    findall(Sobre, member(mundo(_, Sobre), Datos), Sobres),
+    msort(Sobres, Orden),
+    clumped(Orden, Pares),
+    sort(2, @>=, Pares, [[S, A, L]-Cuantos|_]),
+    length(Sobres, Total),
+    Total > 0,
+    Cuantos / Total >= Umbral.
 
 % Las sugerencias que se evalúan: de cada tipo, las cartas que aún pueden
 % estar en el sobre (y, si se pide, las de su mano). Si salen demasiadas,
@@ -354,6 +380,25 @@ respuestas_del_mundo(Tuyas, Orden, mundo(Mundo, Sobre), Entradas) :-
 incertidumbre_del_grupo(_-Miembros, Valor) :-
     findall(P, member(P-_, Miembros), Pesos),
     sum_list(Pesos, Total),
+    (   current_prolog_flag(sherlog_objetivo, Objetivo), Objetivo \== entropia
+    ->  valor_alternativo(Objetivo, Miembros, Total, Valor)
+    ;   incertidumbre_entropia(Miembros, Total, Valor)
+    ).
+
+%   Experimento (issue #32): otras cosas que minimizar.
+%     sobres    mundos distintos del sobre que quedan, ponderado
+%     fallo     probabilidad de equivocarse si hubiera que acusar ya
+valor_alternativo(Objetivo, Miembros, Total, Valor) :-
+    findall(Sobre-P, member(P-Sobre, Miembros), Pares),
+    keysort(Pares, Ordenados),
+    group_pairs_by_key(Ordenados, Grupos),
+    findall(W, ( member(_-Ps, Grupos), sum_list(Ps, W) ), Ws),
+    (   Objetivo == sobres
+    ->  length(Ws, Distintos), Valor is Total * Distintos
+    ;   max_list(Ws, Max), Valor is Total - Max
+    ).
+
+incertidumbre_entropia(Miembros, Total, Valor) :-
     findall(Hs,
             ( member(Pos, [1, 2, 3]),
               findall(Carta-P, ( member(P-Sobre, Miembros), nth1(Pos, Sobre, Carta) ), Pares),

@@ -109,7 +109,7 @@ La IA dedujo la solución sin haber visto esas cartas, solo a partir de quién r
 swipl -q -g run_tests -t halt tests/todos.pl
 ```
 
-Ejecuta los 614 tests (`tests/test_juego.pl`, `tests/test_deduccion.pl`, `tests/test_consola.pl`, `tests/test_ia.pl`, `tests/test_explicacion.pl`, `tests/test_jugador.pl`, `tests/test_turnos.pl`, `tests/test_sherlog.pl` y `tests/test_servidor.pl`, con [plunit](https://www.swi-prolog.org/pldoc/man?section=plunit)). Muestra el progreso, marca con `FAILED` los que fallen y termina con código 0 si todos pasan o con 1 si alguno falla (se comprueba con `echo $status` en fish, o `echo $?` en bash). Tarda unos dos minutos (los tests de probabilidades y las partidas completas con la IA media son los más lentos). Los de la consola no usan el teclado: leen de un texto y escriben en otro.
+Ejecuta los 617 tests (`tests/test_juego.pl`, `tests/test_deduccion.pl`, `tests/test_consola.pl`, `tests/test_ia.pl`, `tests/test_explicacion.pl`, `tests/test_jugador.pl`, `tests/test_turnos.pl`, `tests/test_sherlog.pl` y `tests/test_servidor.pl`, con [plunit](https://www.swi-prolog.org/pldoc/man?section=plunit)). Muestra el progreso, marca con `FAILED` los que fallen y termina con código 0 si todos pasan o con 1 si alguno falla (se comprueba con `echo $status` en fish, o `echo $?` en bash). Tarda unos dos minutos (los tests de probabilidades y las partidas completas con la IA media son los más lentos). Los de la consola no usan el teclado: leen de un texto y escriben en otro.
 
 Para ejecutar solo un archivo:
 
@@ -139,7 +139,7 @@ Juega partidas con IAs media y difícil y, después de cada turno, contrasta el 
 swipl tests/torneo.pl
 ```
 
-Juega las 20 combinaciones posibles de tres niveles (`azar`, `facil`, `media`, `dificil`), 100 partidas cada una, con los asientos rotando. Mide victorias, jugadores eliminados por acusar mal y turnos por partida, y escribe `resultados/torneo.csv`, `resultados/torneo.md` y `resultados/torneo_tiempos.csv`. Usa todos los hilos del ordenador (en 12 hilos tarda unos 12 minutos). Con la misma semilla da exactamente la misma tabla, en serie o en paralelo (los tiempos van en un archivo aparte porque dependen de la máquina). Acepta partidas, semilla, hilos (o `serie`) y carpeta de salida: `swipl tests/torneo.pl 20 7 4 /tmp/res`.
+Juega las 20 combinaciones posibles de tres niveles (`azar`, `facil`, `media`, `dificil`), 100 partidas cada una, con los asientos rotando. Mide victorias, jugadores eliminados por acusar mal y turnos por partida, y escribe `resultados/torneo.csv`, `resultados/torneo.md` y `resultados/torneo_tiempos.csv`. Usa todos los hilos del ordenador (en 12 hilos tarda unos 12 minutos). Con la misma semilla da exactamente la misma tabla, en serie o en paralelo (los tiempos van en un archivo aparte porque dependen de la máquina). Acepta partidas, semilla, hilos (o `serie`) y carpeta de salida: `swipl tests/torneo.pl 20 7 4 /tmp/res`. Con un quinto argumento juega solo una combinación (`swipl tests/torneo.pl 300 2026 12 /tmp/res media+media+dificil`), y con `SHERLOG_UMBRAL=0.4` la difícil acusa antes, con riesgo; los resultados de esos experimentos están en `resultados/dificil_umbral.md`.
 
 Resultado con la semilla 2026: la difícil gana 1,64 veces lo que le tocaría, la media 1,56, la fácil 0,60 y el azar 0,21. La difícil contra dos medias gana el 46 % de las partidas (el 33 % sería jugar igual); la diferencia con la media es pequeña.
 

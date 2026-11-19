@@ -556,6 +556,22 @@ con_el_sobre_deducido_dificil(K) :-
     media_observar(1, sugerencia(1, [chef_canela, daga, gimnasio],
                                  [no_pudo(2), no_pudo(3), no_pudo(4)]), K).
 
+test(con_umbral_acusa_sin_certeza_si_la_probabilidad_llega) :-
+    con_el_sobre_casi_deducido(K),
+    dificil_accion(K, [umbral(0.4)], Accion),
+    Accion = acusar(senora_coral, cuerda, L),
+    memberchk(L, [sala_de_video, gimnasio]).
+
+test(con_umbral_alto_no_se_arriesga) :-
+    con_el_sobre_casi_deducido(K),
+    dificil_accion(K, [umbral(0.9)], Accion),
+    functor(Accion, sugerir, 3).
+
+test(sin_umbral_no_acusa_sin_certeza) :-
+    con_el_sobre_casi_deducido(K),
+    dificil_accion(K, Accion),
+    functor(Accion, sugerir, 3).
+
 test(acusa_si_y_solo_si_la_solucion_es_segura) :-
     forall(member(Preparar, [conocimiento_de_la_demo, con_el_sobre_casi_deducido,
                              con_el_sobre_deducido_dificil]),
