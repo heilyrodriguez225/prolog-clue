@@ -6,7 +6,7 @@ El *qué* y el *por qué* de cada fase. El *ahora* está en el tablero Scrumban.
 
 Sherlog es un juego de deducción al estilo Clue: tú contra 2–4 oponentes de IA que razonan en Prolog. Lo importante del proyecto es **cómo piensa la IA**: cada jugada se convierte en una restricción lógica y el motor CLP(FD) deduce qué cartas pueden estar en el sobre.
 
-Proyecto final de Programación Declarativa: una persona, **un mes** (26 oct – 22 nov 2026), una fase por semana.
+Proyecto final de Programación Declarativa: una persona, **cinco semanas** (26 oct – 10 dic 2026; la entrega se amplió del 22 nov al 10 dic), una fase por semana, con la última más larga.
 
 ## §2 Reglas de Sherlog
 
@@ -314,7 +314,7 @@ El motor CLP(FD) deduce pero no sabe explicar: sus restricciones no guardan el p
 | **F1 — El modelo del juego** | 26 oct – 1 nov | Hay reparto aleatorio y la deducción funciona con el mazo completo y N jugadores, con tests |
 | **F2 — Partida en consola** | 2 – 8 nov | Se juega una partida completa en la terminal contra IAs fácil y media. **Versión mínima entregable** |
 | **F3 — Interfaz web e IA difícil** | 9 – 15 nov | Se juega en el navegador contra IAs de distinto nivel (fácil, media y difícil), con una libreta asistida por el motor |
-| **F4 — Explicación, torneo y entrega** | 16 – 22 nov | La IA explica sus deducciones, hay estadísticas del torneo entre IAs, informe y demo listos |
+| **F4 — Explicación, torneo y entrega** | 16 nov – 10 dic | La IA explica sus deducciones, hay estadísticas del torneo entre IAs, informe y demo listos |
 
 **Regla principal:** al final de F2 tiene que existir un juego completo en consola. Todo lo posterior es mejora.
 
